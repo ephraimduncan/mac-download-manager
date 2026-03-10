@@ -1,8 +1,16 @@
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct DownloadListView: View {
     @Environment(DependencyContainer.self) private var container
     @State private var viewModel: DownloadListViewModel?
+
+    private static let byteFormatter: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.countStyle = .file
+        return f
+    }()
 
     var body: some View {
         NavigationSplitView {
@@ -81,7 +89,7 @@ struct DownloadListView: View {
     @ViewBuilder
     private var detail: some View {
         if let vm = viewModel {
-            downloadList(vm: vm)
+            downloadTable(vm: vm)
                 .navigationTitle(vm.filterOption.displayName)
                 .toolbar { toolbarContent(vm: vm) }
                 .searchable(text: Binding(
@@ -92,7 +100,7 @@ struct DownloadListView: View {
     }
 
     @ViewBuilder
-    private func downloadList(vm: DownloadListViewModel) -> some View {
+    private func downloadTable(vm: DownloadListViewModel) -> some View {
         let items = vm.filteredDownloads
         if items.isEmpty {
             ContentUnavailableView {
@@ -108,22 +116,67 @@ struct DownloadListView: View {
                 }
             }
         } else {
-            List(selection: Binding(
+            Table(items, selection: Binding(
                 get: { vm.selectedDownloadIDs },
                 set: { vm.selectedDownloadIDs = $0 }
+            ), sortOrder: Binding(
+                get: { vm.sortOrder },
+                set: { vm.sortOrder = $0 }
             )) {
-                ForEach(items) { item in
-                    DownloadRowView(item: item)
-                        .tag(item.id)
-                        .contextMenu { contextMenu(vm: vm, item: item) }
+                TableColumn("Name", value: \.filename) { item in
+                    HStack(spacing: 6) {
+                        fileIcon(for: item.filename)
+                        Text(item.filename)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .help(item.filename)
+                    }
+                }
+                .width(min: 200, ideal: 300)
+
+                TableColumn("Size", sortUsing: KeyPathComparator(\.fileSizeForSort)) { item in
+                    if let fileSize = item.fileSize, fileSize > 0 {
+                        Text(Self.byteFormatter.string(fromByteCount: fileSize))
+                            .monospacedDigit()
+                    } else {
+                        Text("—")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .width(min: 60, ideal: 80)
+
+                TableColumn("Status", sortUsing: KeyPathComparator(\.status)) { item in
+                    Text(item.statusLabel)
+                }
+                .width(min: 70, ideal: 100)
+
+                TableColumn("Speed", sortUsing: KeyPathComparator(\.speed)) { item in
+                    if item.status == .downloading, item.speed > 0 {
+                        Text("\(Self.byteFormatter.string(fromByteCount: item.speed))/s")
+                            .monospacedDigit()
+                    } else {
+                        Text("—")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .width(min: 70, ideal: 90)
+
+                TableColumn("Date Added", value: \.createdAt) { item in
+                    Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                }
+                .width(min: 100, ideal: 140)
+            }
+            .contextMenu(forSelectionType: UUID.self) { selectedIDs in
+                if let item = items.first(where: { selectedIDs.contains($0.id) }) {
+                    contextMenuItems(vm: vm, item: item)
                 }
             }
-            .listStyle(.inset(alternatesRowBackgrounds: true))
+            .alternatingRowBackgrounds()
         }
     }
 
     @ViewBuilder
-    private func contextMenu(vm: DownloadListViewModel, item: DownloadItem) -> some View {
+    private func contextMenuItems(vm: DownloadListViewModel, item: DownloadItem) -> some View {
         switch item.status {
         case .downloading, .waiting:
             Button("Pause") { Task { await vm.pauseDownload(item) } }
@@ -213,6 +266,15 @@ struct DownloadListView: View {
         }
         lines.append("Added: \(item.createdAt.formatted(date: .abbreviated, time: .shortened))")
         return lines.joined(separator: "\n")
+    }
+
+    private func fileIcon(for filename: String) -> some View {
+        let ext = (filename as NSString).pathExtension
+        let utType = UTType(filenameExtension: ext) ?? .data
+        let icon = NSWorkspace.shared.icon(for: utType)
+        return Image(nsImage: icon)
+            .resizable()
+            .frame(width: 16, height: 16)
     }
 
     private func iconForFilter(_ option: FilterOption) -> String {

@@ -25,6 +25,21 @@ struct DownloadItem: Identifiable, Sendable, Equatable {
         status == .downloading || status == .waiting
     }
 
+    var fileSizeForSort: Int64 {
+        fileSize ?? 0
+    }
+
+    var statusLabel: String {
+        switch status {
+        case .waiting: "Waiting"
+        case .downloading: "Downloading"
+        case .paused: "Paused"
+        case .completed: "Completed"
+        case .error: "Error"
+        case .removed: "Removed"
+        }
+    }
+
     init(
         id: UUID = UUID(),
         url: URL,
@@ -75,8 +90,23 @@ struct DownloadItem: Identifiable, Sendable, Equatable {
     }
 }
 
-enum DownloadStatus: String, Codable, Sendable, CaseIterable {
-    case waiting, downloading, paused, completed, error, removed
+enum DownloadStatus: String, Codable, Sendable, CaseIterable, Comparable {
+    case downloading, waiting, paused, completed, error, removed
+
+    private var sortIndex: Int {
+        switch self {
+        case .downloading: 0
+        case .waiting: 1
+        case .paused: 2
+        case .completed: 3
+        case .error: 4
+        case .removed: 5
+        }
+    }
+
+    static func < (lhs: DownloadStatus, rhs: DownloadStatus) -> Bool {
+        lhs.sortIndex < rhs.sortIndex
+    }
 }
 
 enum FilterOption: String, CaseIterable, Sendable {

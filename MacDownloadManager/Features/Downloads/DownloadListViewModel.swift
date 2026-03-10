@@ -19,6 +19,7 @@ final class DownloadListViewModel {
   var errorMessage: String?
   var isAddURLPresented = false
   var selectedDownloadIDs: Set<UUID> = []
+  var sortOrder: [KeyPathComparator<DownloadItem>] = [KeyPathComparator(\.createdAt, order: .reverse)]
   var pendingDuplicate: DownloadItem?
   private var pendingDownloadParams:
     (url: URL, headers: [String: String], directory: String, segments: Int)?
@@ -39,6 +40,7 @@ final class DownloadListViewModel {
           || $0.url.absoluteString.localizedCaseInsensitiveContains(searchText)
       }
     }
+    items.sort(using: sortOrder)
     return items
   }
 
