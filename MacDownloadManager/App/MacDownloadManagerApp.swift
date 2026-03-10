@@ -26,7 +26,7 @@ struct MacDownloadManagerApp: App {
         } label: {
             Label("Downloads", systemImage: container.menuBarIcon)
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
 
         Settings {
             SettingsView()

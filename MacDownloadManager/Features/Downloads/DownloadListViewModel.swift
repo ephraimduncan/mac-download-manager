@@ -170,8 +170,9 @@ final class DownloadListViewModel {
     func updateFromAria2() async {
         do {
             let activeStatuses = try await aria2.tellActive()
+            let waitingStatuses = try await aria2.tellWaiting(offset: 0, count: 100)
             let stoppedStatuses = try await aria2.tellStopped(offset: 0, count: 100)
-            let allStatuses = activeStatuses + stoppedStatuses
+            let allStatuses = activeStatuses + waitingStatuses + stoppedStatuses
 
             for status in allStatuses {
                 guard let index = downloads.firstIndex(where: { $0.aria2Gid == status.gid }) else {
