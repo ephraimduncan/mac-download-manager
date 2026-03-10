@@ -37,15 +37,18 @@ struct DownloadListView: View {
             get: { viewModel?.isAddURLPresented ?? false },
             set: { viewModel?.isAddURLPresented = $0 }
         )) {
-            if let vm = viewModel {
-                AddURLSheet { url, headers, directory, segments in
-                    await vm.addDownload(
-                        url: url,
-                        headers: headers,
-                        directory: directory,
-                        segments: segments
-                    )
-                }
+            AddDownloadDialog(
+                viewModel: AddDownloadViewModel(
+                    metadataService: DefaultURLMetadataService(),
+                    repository: container.repository,
+                    aria2: container.aria2Client,
+                    settings: SettingsViewModel()
+                )
+            )
+        }
+        .onChange(of: viewModel?.isAddURLPresented) { _, newValue in
+            if newValue == false {
+                Task { await viewModel?.loadDownloads() }
             }
         }
         .alert(
@@ -59,19 +62,6 @@ struct DownloadListView: View {
             Button("OK", role: .cancel) {}
         } message: { message in
             Text(message)
-        }
-        .alert(
-            "Download Already Exists",
-            isPresented: Binding(
-                get: { viewModel?.pendingDuplicate != nil },
-                set: { if !$0 { viewModel?.cancelDuplicate() } }
-            ),
-            presenting: viewModel?.pendingDuplicate
-        ) { _ in
-            Button("Skip", role: .cancel) { viewModel?.cancelDuplicate() }
-            Button("Download") { viewModel?.confirmDuplicate() }
-        } message: { item in
-            Text(duplicateMessage(for: item))
         }
     }
 
@@ -268,20 +258,6 @@ struct DownloadListView: View {
             return nil
         }
         return vm.filteredDownloads.first { $0.id == id }
-    }
-
-    private func duplicateMessage(for item: DownloadItem) -> String {
-        var lines: [String] = []
-        let urlString = item.url.absoluteString
-        lines.append(urlString.count > 80 ? String(urlString.prefix(77)) + "..." : urlString)
-        if let path = item.filePath {
-            lines.append("Location: \(path)")
-        }
-        if let size = item.fileSize, size > 0 {
-            lines.append("Size: \(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))")
-        }
-        lines.append("Added: \(item.createdAt.formatted(date: .abbreviated, time: .shortened))")
-        return lines.joined(separator: "\n")
     }
 
     private func fileIcon(for filename: String) -> some View {
