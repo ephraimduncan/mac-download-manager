@@ -10,3 +10,4 @@ Pods/
 *.app
 run.sh
 scripts/.cache/
+.factory/
