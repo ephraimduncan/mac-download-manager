@@ -49,33 +49,26 @@ struct AddDownloadDialog: View {
 
     private var idleContent: some View {
         VStack(spacing: 16) {
-            Text("Enter URL or choose torrent file")
+            Text("Enter URL")
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 8) {
-                TextField("URL", text: $viewModel.urlText, prompt: Text("https://example.com/file.zip"))
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit {
-                        if viewModel.isOKEnabled {
-                            Task { await viewModel.submitURL() }
-                        }
+            TextField("URL", text: $viewModel.urlText, prompt: Text("https://example.com/file.zip"))
+                .textFieldStyle(.roundedBorder)
+                .onSubmit {
+                    if viewModel.isOKEnabled {
+                        Task { await viewModel.submitURL() }
                     }
-
-                Button("Browse") {
-                    // Non-functional per spec
                 }
-                .buttonStyle(.bordered)
-            }
 
             HStack {
+                Spacer()
+
                 Button("Cancel") {
                     viewModel.cancel()
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
-
-                Spacer()
 
                 Button("OK") {
                     Task { await viewModel.submitURL() }
@@ -91,21 +84,13 @@ struct AddDownloadDialog: View {
 
     private var queryingContent: some View {
         VStack(spacing: 16) {
-            Text("Enter URL or choose torrent file")
+            Text("Enter URL")
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 8) {
-                TextField("URL", text: .constant(viewModel.urlText), prompt: Text("https://example.com/file.zip"))
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(true)
-
-                Button("Browse") {
-                    // Non-functional per spec
-                }
-                .buttonStyle(.bordered)
+            TextField("URL", text: .constant(viewModel.urlText), prompt: Text("https://example.com/file.zip"))
+                .textFieldStyle(.roundedBorder)
                 .disabled(true)
-            }
 
             HStack(spacing: 8) {
                 ProgressView()
@@ -116,13 +101,13 @@ struct AddDownloadDialog: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack {
+                Spacer()
+
                 Button("Cancel") {
                     viewModel.cancel()
                     dismiss()
                 }
                 .keyboardShortcut(.cancelAction)
-
-                Spacer()
 
                 Button("OK") {}
                     .disabled(true)

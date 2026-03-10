@@ -25,13 +25,14 @@ struct DuplicateDownloadView: View {
             }
 
             HStack {
-                Button("SKIP", action: onSkip)
-                    .keyboardShortcut(.cancelAction)
-
                 Spacer()
 
-                Button("DOWNLOAD", action: onDownload)
+                Button("Skip", action: onSkip)
+                    .keyboardShortcut(.cancelAction)
+
+                Button("Download", action: onDownload)
                     .keyboardShortcut(.defaultAction)
+                    .textCase(nil)
             }
         }
         .padding(20)

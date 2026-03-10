@@ -19,72 +19,63 @@ struct NewDownloadView: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Save to
-            HStack(spacing: 8) {
+            VStack(spacing: 6) {
                 Text("Save to:")
-                    .frame(width: 60, alignment: .trailing)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 8) {
+                    PopUpButton(
+                        selection: $viewModel.selectedDirectory,
+                        options: viewModel.directoryOptions
+                    )
 
-                Picker("", selection: $viewModel.selectedDirectory) {
-                    ForEach(viewModel.directoryOptions, id: \.self) { dir in
-                        Text(dir)
-                            .tag(dir)
+                    Button("Browse...") {
+                        chooseDirectory()
                     }
+                    .buttonStyle(.bordered)
                 }
-                .labelsHidden()
-
-                Button("Browse...") {
-                    chooseDirectory()
-                }
-                .buttonStyle(.bordered)
             }
 
-            // File name
-            HStack(spacing: 8) {
+            VStack(spacing: 6) {
                 Text("File name:")
-                    .frame(width: 60, alignment: .trailing)
-
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 TextField("Filename", text: $viewModel.editableFilename)
                     .textFieldStyle(.roundedBorder)
             }
 
-            // File size and disk space
-            HStack(spacing: 16) {
-                HStack(spacing: 4) {
-                    Text("Size:")
-                        .foregroundStyle(.secondary)
-                    if let fileSize = metadata.fileSize {
-                        Text(Self.byteFormatter.string(fromByteCount: fileSize))
-                    } else {
-                        Text("Unknown")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
+            HStack(spacing: 4) {
                 Spacer()
-
-                HStack(spacing: 4) {
-                    Text("Disk space:")
+                Text("Size:")
+                    .foregroundStyle(.secondary)
+                if let fileSize = metadata.fileSize {
+                    Text(Self.byteFormatter.string(fromByteCount: fileSize))
+                } else {
+                    Text("Unknown")
                         .foregroundStyle(.secondary)
-                    if let diskSpace = viewModel.availableDiskSpace {
-                        Text(Self.byteFormatter.string(fromByteCount: diskSpace))
-                    } else {
-                        Text("Unknown")
-                            .foregroundStyle(.secondary)
-                    }
+                }
+                Text("·")
+                    .foregroundStyle(.secondary)
+                Text("Disk space:")
+                    .foregroundStyle(.secondary)
+                if let diskSpace = viewModel.availableDiskSpace {
+                    Text(Self.byteFormatter.string(fromByteCount: diskSpace))
+                } else {
+                    Text("Unknown")
+                        .foregroundStyle(.secondary)
                 }
             }
             .font(.caption)
 
             // Buttons
             HStack {
+                Spacer()
+
                 Button("Cancel", action: onCancel)
                     .keyboardShortcut(.cancelAction)
 
-                Spacer()
-
-                Button("DOWNLOAD", action: onDownload)
+                Button("Download", action: onDownload)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!viewModel.isDownloadEnabled)
+                    .textCase(nil)
             }
         }
         .padding(20)
@@ -99,6 +90,43 @@ struct NewDownloadView: View {
         panel.directoryURL = URL(fileURLWithPath: viewModel.selectedDirectory)
         if panel.runModal() == .OK, let url = panel.url {
             viewModel.addBrowsedDirectory(url.path(percentEncoded: false))
+        }
+    }
+}
+
+private struct PopUpButton: NSViewRepresentable {
+    @Binding var selection: String
+    var options: [String]
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.selectionChanged(_:))
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        button.removeAllItems()
+        button.addItems(withTitles: options)
+        button.selectItem(withTitle: selection)
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(selection: $selection)
+    }
+
+    final class Coordinator: NSObject {
+        var selection: Binding<String>
+
+        init(selection: Binding<String>) {
+            self.selection = selection
+        }
+
+        @objc func selectionChanged(_ sender: NSPopUpButton) {
+            if let title = sender.titleOfSelectedItem {
+                selection.wrappedValue = title
+            }
         }
     }
 }

@@ -31,6 +31,8 @@ final class DownloadListViewModel {
       items = items.filter { $0.isActive }
     case .completed:
       items = items.filter { $0.status == .completed }
+    case .paused:
+      items = items.filter { $0.status == .paused }
     case .all:
       break
     }

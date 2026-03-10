@@ -280,15 +280,7 @@ final class AddDownloadViewModel {
     }
 
     private func resolveDefaultDirectory() -> String {
-        let dir = settings.defaultDownloadDir
-        if dir.isEmpty {
-            return URL.downloadsDirectory.path()
-        }
-        // Verify the stored directory actually exists on disk; fall back to ~/Downloads if stale/invalid
-        if !fileManager.fileExists(atPath: dir) {
-            return URL.downloadsDirectory.path()
-        }
-        return dir
+        URL.downloadsDirectory.path()
     }
 
     private func refreshDiskSpace() {

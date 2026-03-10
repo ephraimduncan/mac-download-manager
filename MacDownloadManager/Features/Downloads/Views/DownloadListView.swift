@@ -6,6 +6,8 @@ struct DownloadListView: View {
     @Environment(DependencyContainer.self) private var container
     @State private var viewModel: DownloadListViewModel?
     @State private var addDownloadViewModel: AddDownloadViewModel?
+    @State private var showDeleteConfirmation = false
+    @State private var itemToDelete: DownloadItem?
 
     private static let byteFormatter: ByteCountFormatter = {
         let f = ByteCountFormatter()
@@ -67,6 +69,17 @@ struct DownloadListView: View {
             Button("OK", role: .cancel) {}
         } message: { message in
             Text(message)
+        }
+        .confirmationDialog(
+            "Delete selected download",
+            isPresented: $showDeleteConfirmation,
+            presenting: itemToDelete
+        ) { item in
+            Button("Delete", role: .destructive) {
+                Task { await viewModel?.removeDownload(item) }
+            }
+        } message: { item in
+            Text("Are you sure you want to delete \"\(item.filename)\"?")
         }
     }
 
@@ -199,7 +212,10 @@ struct DownloadListView: View {
 
         Divider()
 
-        Button("Remove", role: .destructive) { Task { await vm.removeDownload(item) } }
+        Button("Remove", role: .destructive) {
+            itemToDelete = item
+            showDeleteConfirmation = true
+        }
 
         if item.status == .completed {
             Button("Reveal in Finder") { vm.revealInFinder(item) }
@@ -241,7 +257,8 @@ struct DownloadListView: View {
 
             Button {
                 guard let selected = selectedItem(vm: vm) else { return }
-                Task { await vm.removeDownload(selected) }
+                itemToDelete = selected
+                showDeleteConfirmation = true
             } label: {
                 Label("Remove", systemImage: "trash")
             }
@@ -278,6 +295,7 @@ struct DownloadListView: View {
         switch option {
         case .active: "arrow.down.circle"
         case .completed: "checkmark.circle"
+        case .paused: "pause.circle"
         case .all: "list.bullet"
         }
     }
