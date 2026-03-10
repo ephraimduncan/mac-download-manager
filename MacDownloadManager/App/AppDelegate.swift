@@ -145,6 +145,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let stat = try await container.aria2Client.getGlobalStat()
             let activeCount = Int(stat.numActive) ?? 0
             container.activeDownloadCount = activeCount
+            container.globalDownloadSpeed = Int64(stat.downloadSpeed) ?? 0
+
+            let active = try await container.aria2Client.tellActive()
+            let waiting = try await container.aria2Client.tellWaiting(offset: 0, count: 100)
+
+            container.menuBarDownloads = (active + waiting).map { status in
+                let filename = status.files?.first.map {
+                    URL(fileURLWithPath: $0.path).lastPathComponent
+                } ?? status.gid
+
+                return MenuBarDownload(
+                    id: status.gid,
+                    filename: filename,
+                    progress: status.progress,
+                    speed: status.speedBytesPerSec,
+                    gid: status.gid,
+                    status: status.status
+                )
+            }
 
             if activeCount > 0 {
                 beginDownloadActivity()

@@ -23,11 +23,10 @@ struct MacDownloadManagerApp: App {
         MenuBarExtra {
             MenuBarView()
                 .environment(container)
-                .frame(width: 320, height: 400)
         } label: {
             Label("Downloads", systemImage: container.menuBarIcon)
         }
-        .menuBarExtraStyle(.window)
+        .menuBarExtraStyle(.menu)
 
         Settings {
             SettingsView()

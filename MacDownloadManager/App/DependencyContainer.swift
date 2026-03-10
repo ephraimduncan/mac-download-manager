@@ -1,5 +1,14 @@
 import SwiftUI
 
+struct MenuBarDownload: Identifiable, Sendable {
+    let id: String
+    var filename: String
+    var progress: Double
+    var speed: Int64
+    var gid: String
+    var status: String
+}
+
 @Observable @MainActor
 final class DependencyContainer {
     static var shared: DependencyContainer!
@@ -14,6 +23,8 @@ final class DependencyContainer {
     let aria2Port: Int
 
     var activeDownloadCount: Int = 0
+    var menuBarDownloads: [MenuBarDownload] = []
+    var globalDownloadSpeed: Int64 = 0
 
     var menuBarIcon: String {
         activeDownloadCount > 0 ? "arrow.down.circle.fill" : "arrow.down.circle"
