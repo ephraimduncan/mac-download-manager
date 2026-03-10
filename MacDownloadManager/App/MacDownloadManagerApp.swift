@@ -15,8 +15,10 @@ struct MacDownloadManagerApp: App {
         Window("Mac Download Manager", id: "main") {
             DownloadListView()
                 .environment(container)
+                .frame(minWidth: 600, minHeight: 400)
         }
         .defaultSize(width: 700, height: 500)
+        .windowResizability(.contentMinSize)
 
         MenuBarExtra {
             MenuBarView()
