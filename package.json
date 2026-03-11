@@ -1,0 +1,15 @@
+{
+  "name": "mac-download-manager-extensions",
+  "version": "1.0.0",
+  "description": "Cross-browser extensions for Mac Download Manager",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-extensions.js",
+    "test": "node --test Tests/build.test.js",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "web-ext": "^9.2.0"
+  }
+}

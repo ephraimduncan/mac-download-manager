@@ -11,3 +11,5 @@ Pods/
 run.sh
 scripts/.cache/
 .factory/
+dist/
+node_modules/
