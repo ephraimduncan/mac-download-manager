@@ -200,7 +200,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 endDownloadActivity()
             }
         } catch {
-            // aria2 may not be ready yet
         }
     }
 

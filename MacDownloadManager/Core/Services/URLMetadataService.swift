@@ -108,7 +108,6 @@ final class DefaultURLMetadataService: URLMetadataService {
         return nil
     }
 
-    /// Decodes RFC 5987 encoded value: `charset'language'percent-encoded-value`
     private func decodeRFC5987(_ value: String) -> String? {
         let components = value.split(
             separator: "'",

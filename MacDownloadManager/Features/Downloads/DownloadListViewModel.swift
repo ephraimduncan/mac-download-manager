@@ -72,7 +72,6 @@ final class DownloadListViewModel {
         return
       }
     } catch {
-      // proceed with download if lookup fails
     }
 
     await performDownload(url: url, headers: headers, directory: directory, segments: segments)
@@ -231,7 +230,6 @@ final class DownloadListViewModel {
         await reconcilePersistedDownloadsWithAria2(allStatuses)
       }
     } catch {
-      // aria2 connection may be temporarily unavailable
     }
   }
 
@@ -289,15 +287,19 @@ final class DownloadListViewModel {
         aria2Gid: existing.aria2Gid
       )
 
-      if var record = try? await repository.fetchByGid(status.gid) {
-        record.progress = resolvedProgress
-        record.fileSize = status.totalBytes > 0 ? status.totalBytes : record.fileSize
-        record.status = mappedStatus.rawValue
-        record.filename = resolvedFilename
-        if mappedStatus == .completed && record.completedAt == nil {
-          record.completedAt = Date()
+      do {
+        if var record = try await repository.fetchByGid(status.gid) {
+          record.progress = resolvedProgress
+          record.fileSize = status.totalBytes > 0 ? status.totalBytes : record.fileSize
+          record.status = mappedStatus.rawValue
+          record.filename = resolvedFilename
+          if mappedStatus == .completed && record.completedAt == nil {
+            record.completedAt = Date()
+          }
+          try await repository.update(record)
         }
-        try? await repository.update(record)
+      } catch {
+        errorMessage = "Failed to persist status update: \(error.localizedDescription)"
       }
     }
   }

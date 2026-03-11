@@ -109,7 +109,6 @@ final class AddDownloadViewModel {
                 return
             }
         } catch {
-            // Proceed to new download if lookup fails
         }
 
         guard generation == queryGeneration, case .querying = state else { return }
@@ -163,9 +162,7 @@ final class AddDownloadViewModel {
             )
 
             try await repository.save(record)
-        } catch {
-            // Best effort — still reset state
-        }
+        } catch {}
 
         resetState()
     }
@@ -204,9 +201,7 @@ final class AddDownloadViewModel {
             )
 
             try await repository.save(record)
-        } catch {
-            // Best effort — still reset state
-        }
+        } catch {}
 
         resetState()
     }

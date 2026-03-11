@@ -73,14 +73,15 @@ struct DownloadItem: Identifiable, Sendable, Equatable {
     }
 
     init(record: DownloadRecord) {
+        let parsedURL = URL(string: record.url)
         self.id = record.id
-        self.url = URL(string: record.url) ?? URL(string: "about:blank")!
+        self.url = parsedURL ?? URL(string: "about:blank")!
         self.filename = record.filename
         self.fileSize = record.fileSize
         self.downloadedSize = Int64(record.progress * Double(record.fileSize ?? 0))
         self.progress = record.progress
         self.speed = 0
-        self.status = URL(string: record.url) != nil
+        self.status = parsedURL != nil
             ? (DownloadStatus(rawValue: record.status) ?? .error)
             : .error
         self.segments = record.segments
