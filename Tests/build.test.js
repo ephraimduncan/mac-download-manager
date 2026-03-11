@@ -98,6 +98,86 @@ describe("Chrome manifest", () => {
     assert.ok(manifest.icons["48"]);
     assert.ok(manifest.icons["128"]);
   });
+
+  it("does not have background.scripts (Chrome uses service_worker only)", () => {
+    assert.equal(manifest.background.scripts, undefined);
+  });
+
+  it("does not have browser_specific_settings (Chrome-only manifest)", () => {
+    assert.equal(manifest.browser_specific_settings, undefined);
+  });
+});
+
+describe("Chrome extension code", () => {
+  let bgCode;
+  let popupCode;
+  let popupCss;
+  let popupHtml;
+
+  before(() => {
+    bgCode = readFileSync(join(DIST, "chrome", "background.js"), "utf8");
+    popupCode = readFileSync(join(DIST, "chrome", "popup.js"), "utf8");
+    popupCss = readFileSync(join(DIST, "chrome", "popup.css"), "utf8");
+    popupHtml = readFileSync(join(DIST, "chrome", "popup.html"), "utf8");
+  });
+
+  it("background.js uses onDeterminingFilename for download interception", () => {
+    assert.ok(bgCode.includes("onDeterminingFilename"), "should use onDeterminingFilename");
+  });
+
+  it("background.js uses onSendHeaders for header caching", () => {
+    assert.ok(bgCode.includes("onSendHeaders"), "should use onSendHeaders");
+  });
+
+  it("background.js connects via connectNative with correct host", () => {
+    assert.ok(bgCode.includes('connectNative'), "should use connectNative");
+    assert.ok(bgCode.includes('com.macdownloadmanager.helper'), "should use correct native host ID");
+  });
+
+  it("background.js shows badge for connection status", () => {
+    assert.ok(bgCode.includes('setBadgeText'), "should set badge text");
+    assert.ok(bgCode.includes('"!"'), "should show '!' when disconnected");
+  });
+
+  it("background.js supports auto-reconnect on disconnect", () => {
+    assert.ok(bgCode.includes('onDisconnect'), "should handle disconnect");
+    assert.ok(bgCode.includes('setTimeout'), "should auto-reconnect after timeout");
+  });
+
+  it("background.js caches Cookie, Authorization, Referer, User-Agent headers", () => {
+    assert.ok(bgCode.includes('"cookie"'), "should cache cookie header");
+    assert.ok(bgCode.includes('"authorization"'), "should cache authorization header");
+    assert.ok(bgCode.includes('"referer"'), "should cache referer header");
+    assert.ok(bgCode.includes('"user-agent"'), "should cache user-agent header");
+  });
+
+  it("popup.js loads/saves settings via chrome.storage.sync", () => {
+    assert.ok(popupCode.includes("chrome.storage.sync.get"), "should load settings from sync");
+    assert.ok(popupCode.includes("chrome.storage.sync.set"), "should save settings to sync");
+  });
+
+  it("popup.html has enable toggle", () => {
+    assert.ok(popupHtml.includes('id="enabled"'), "should have enabled toggle");
+    assert.ok(popupHtml.includes('type="checkbox"'), "should have checkbox input");
+  });
+
+  it("popup.html has file types input", () => {
+    assert.ok(popupHtml.includes('id="fileTypes"'), "should have file types input");
+  });
+
+  it("popup.html has min size slider", () => {
+    assert.ok(popupHtml.includes('id="minSize"'), "should have min size slider");
+    assert.ok(popupHtml.includes('type="range"'), "should have range input");
+  });
+
+  it("popup.html has connection status indicator", () => {
+    assert.ok(popupHtml.includes('id="statusDot"'), "should have status dot");
+    assert.ok(popupHtml.includes('id="statusText"'), "should have status text");
+  });
+
+  it("popup.css supports dark mode via prefers-color-scheme", () => {
+    assert.ok(popupCss.includes("prefers-color-scheme: dark"), "should have dark mode media query");
+  });
 });
 
 describe("Firefox manifest", () => {
@@ -157,6 +237,14 @@ describe("Edge manifest", () => {
       readFileSync(join(DIST, "chrome", "manifest.json"), "utf8")
     );
     assert.deepEqual(manifest.permissions, chromeManifest.permissions);
+  });
+
+  it("does not have background.scripts (Edge uses service_worker only)", () => {
+    assert.equal(manifest.background.scripts, undefined);
+  });
+
+  it("does not have browser_specific_settings (Edge-only manifest)", () => {
+    assert.equal(manifest.browser_specific_settings, undefined);
   });
 });
 

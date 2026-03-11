@@ -50,16 +50,7 @@ function baseManifest() {
 function chromeManifest() {
   const manifest = baseManifest();
   manifest.name = "Mac Download Manager";
-  manifest.background = {
-    service_worker: "background.js",
-    scripts: ["background.js"],
-  };
-  manifest.browser_specific_settings = {
-    gecko: {
-      id: "macdownloadmanager@example.com",
-      strict_min_version: "109.0",
-    },
-  };
+  manifest.background = { service_worker: "background.js" };
   return manifest;
 }
 
@@ -68,16 +59,7 @@ function edgeManifest() {
   manifest.name = "Mac Download Manager for Edge";
   manifest.description =
     "Intercept downloads and send them to Mac Download Manager for accelerated downloading (Edge)";
-  manifest.background = {
-    service_worker: "background.js",
-    scripts: ["background.js"],
-  };
-  manifest.browser_specific_settings = {
-    gecko: {
-      id: "macdownloadmanager-edge@example.com",
-      strict_min_version: "109.0",
-    },
-  };
+  manifest.background = { service_worker: "background.js" };
   return manifest;
 }
 
