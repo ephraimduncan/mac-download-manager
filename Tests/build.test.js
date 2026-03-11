@@ -306,6 +306,91 @@ describe("Edge manifest", () => {
   it("does not have browser_specific_settings (Edge-only manifest)", () => {
     assert.equal(manifest.browser_specific_settings, undefined);
   });
+
+  it("has same host_permissions as Chrome", () => {
+    const chromeManifest = JSON.parse(
+      readFileSync(join(DIST, "chrome", "manifest.json"), "utf8")
+    );
+    assert.deepEqual(manifest.host_permissions, chromeManifest.host_permissions);
+  });
+
+  it("has action with popup and icons", () => {
+    assert.equal(manifest.action.default_popup, "popup.html");
+    assert.ok(manifest.action.default_icon["16"]);
+    assert.ok(manifest.action.default_icon["48"]);
+    assert.ok(manifest.action.default_icon["128"]);
+  });
+
+  it("has Edge-specific description", () => {
+    assert.ok(
+      manifest.description.toLowerCase().includes("edge"),
+      "Edge manifest should mention Edge in description"
+    );
+  });
+
+  it("differs from Chrome only in name and description", () => {
+    const chromeManifest = JSON.parse(
+      readFileSync(join(DIST, "chrome", "manifest.json"), "utf8")
+    );
+    const edgeCopy = { ...manifest, name: chromeManifest.name, description: chromeManifest.description };
+    assert.deepEqual(edgeCopy, chromeManifest);
+  });
+});
+
+describe("Edge extension code", () => {
+  let bgCode;
+  let popupCode;
+
+  before(() => {
+    bgCode = readFileSync(join(DIST, "edge", "background.js"), "utf8");
+    popupCode = readFileSync(join(DIST, "edge", "popup.js"), "utf8");
+  });
+
+  it("background.js uses chrome.* namespace", () => {
+    assert.ok(bgCode.includes("chrome."), "should use chrome.* namespace");
+    assert.ok(!bgCode.includes("browser."), "should not use browser.* namespace in Edge");
+  });
+
+  it("background.js uses onDeterminingFilename for download interception", () => {
+    assert.ok(bgCode.includes("onDeterminingFilename"), "should use onDeterminingFilename (same as Chrome)");
+  });
+
+  it("background.js uses chrome.webRequest.onSendHeaders for header caching", () => {
+    assert.ok(bgCode.includes("chrome.webRequest.onSendHeaders"), "should use chrome.webRequest.onSendHeaders");
+  });
+
+  it("background.js connects via connectNative with correct host", () => {
+    assert.ok(bgCode.includes("connectNative"), "should use connectNative");
+    assert.ok(bgCode.includes("com.macdownloadmanager.helper"), "should use correct native host ID");
+  });
+
+  it("popup.js uses chrome.storage.sync for settings", () => {
+    assert.ok(popupCode.includes("chrome.storage.sync.get"), "should load settings via chrome.storage.sync");
+    assert.ok(popupCode.includes("chrome.storage.sync.set"), "should save settings via chrome.storage.sync");
+  });
+
+  it("popup.html exists with enable toggle and settings", () => {
+    const popupHtml = readFileSync(join(DIST, "edge", "popup.html"), "utf8");
+    assert.ok(popupHtml.includes('id="enabled"'), "should have enabled toggle");
+    assert.ok(popupHtml.includes('id="fileTypes"'), "should have file types input");
+    assert.ok(popupHtml.includes('id="minSize"'), "should have min size slider");
+    assert.ok(popupHtml.includes('id="statusDot"'), "should have status indicator");
+  });
+
+  it("popup.css supports dark mode", () => {
+    const popupCss = readFileSync(join(DIST, "edge", "popup.css"), "utf8");
+    assert.ok(popupCss.includes("prefers-color-scheme: dark"), "should have dark mode media query");
+  });
+
+  it("background.js is identical to Chrome background.js", () => {
+    const chromeBg = readFileSync(join(DIST, "chrome", "background.js"), "utf8");
+    assert.equal(bgCode, chromeBg, "Edge and Chrome background.js should be identical");
+  });
+
+  it("popup.js is identical to Chrome popup.js", () => {
+    const chromePopup = readFileSync(join(DIST, "chrome", "popup.js"), "utf8");
+    assert.equal(popupCode, chromePopup, "Edge and Chrome popup.js should be identical");
+  });
 });
 
 describe("version injection", () => {
