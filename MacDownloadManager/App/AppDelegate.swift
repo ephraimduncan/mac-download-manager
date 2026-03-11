@@ -127,36 +127,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func registerNativeMessagingManifest() {
-        let chromeDir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Google/Chrome/NativeMessagingHosts")
-
-        try? FileManager.default.createDirectory(at: chromeDir, withIntermediateDirectories: true)
-
         let helperPath = Bundle.main.bundlePath + "/Contents/MacOS/NativeMessagingHelper"
-
-        struct NativeManifest: Encodable {
-            let name: String
-            let description: String
-            let path: String
-            let type: String
-            let allowed_origins: [String]
-        }
-
-        let manifest = NativeManifest(
-            name: "com.macdownloadmanager.helper",
-            description: "Mac Download Manager Native Messaging Host",
-            path: helperPath,
-            type: "stdio",
-            allowed_origins: ["chrome-extension://YOUR_EXTENSION_ID/"]
-        )
-
-        let manifestPath = chromeDir.appendingPathComponent("com.macdownloadmanager.helper.json")
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
-        if let data = try? encoder.encode(manifest) {
-            try? data.write(to: manifestPath)
-        }
+        NativeMessagingRegistration.registerAll(helperPath: helperPath)
     }
 
     private func startPolling() {
