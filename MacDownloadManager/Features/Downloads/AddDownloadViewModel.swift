@@ -1,11 +1,9 @@
 import Foundation
 
-/// Provides available disk space for a given directory path. Abstracted for testability.
 protocol DiskSpaceProviding: Sendable {
     func availableDiskSpace(at path: String) -> Int64?
 }
 
-/// Default implementation using FileManager.
 struct SystemDiskSpaceProvider: DiskSpaceProviding {
     func availableDiskSpace(at path: String) -> Int64? {
         let url = URL(fileURLWithPath: path)
@@ -29,33 +27,23 @@ final class AddDownloadViewModel {
     }
 
     private(set) var state: State = .idle
-
-    /// URL text binding for the input field.
     var urlText: String = ""
-
-    /// Editable filename for the new download dialog.
     var editableFilename: String = ""
 
-    /// Selected download directory.
     var selectedDirectory: String = "" {
         didSet {
             refreshDiskSpace()
         }
     }
 
-    /// Directory options for the Picker dropdown.
     private(set) var directoryOptions: [String] = []
-
-    /// Available disk space for the selected directory.
     private(set) var availableDiskSpace: Int64?
 
-    /// Whether the OK button should be enabled (valid URL in idle state).
     var isOKEnabled: Bool {
         guard case .idle = state else { return false }
         return isValidHTTPURL(urlText)
     }
 
-    /// Whether the DOWNLOAD button should be enabled in new download state.
     var isDownloadEnabled: Bool {
         guard case .newDownload = state else { return false }
         return isValidFilename(editableFilename)
@@ -72,16 +60,8 @@ final class AddDownloadViewModel {
     private let diskSpaceProvider: any DiskSpaceProviding
     private let fileManager: FileManager
 
-    /// Tracks the current query task for cancellation.
-    private var currentQueryTask: Task<Void, Never>?
-
-    /// Generation counter to ignore late completions after cancel.
     private var queryGeneration: Int = 0
-
-    /// Cached metadata from the HEAD request, used when starting a download.
     private var resolvedMetadata: URLMetadata?
-
-    /// The trimmed URL string used for the current flow.
     private var trimmedURLString: String = ""
 
     // MARK: - Init
@@ -104,9 +84,7 @@ final class AddDownloadViewModel {
 
     // MARK: - Actions
 
-    /// Submit the URL (OK button action). Transitions idle -> querying -> duplicateFound or newDownload.
     func submitURL() async {
-        // Only allow submission from idle state (idempotent during querying)
         guard case .idle = state else { return }
 
         let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -118,19 +96,14 @@ final class AddDownloadViewModel {
 
         state = .querying
 
-        // Fetch metadata
         let metadata = await metadataService.fetchMetadata(for: url)
 
-        // Check if cancelled (generation changed)
-        guard generation == queryGeneration else { return }
-        guard case .querying = state else { return }
+        guard generation == queryGeneration, case .querying = state else { return }
 
         resolvedMetadata = metadata
 
-        // Check for duplicate
         do {
             if let existing = try await repository.fetchByURL(trimmed) {
-                // Guard again after async call
                 guard generation == queryGeneration, case .querying = state else { return }
                 state = .duplicateFound(existing)
                 return
@@ -139,10 +112,8 @@ final class AddDownloadViewModel {
             // Proceed to new download if lookup fails
         }
 
-        // Guard again after async call
         guard generation == queryGeneration, case .querying = state else { return }
 
-        // Transition to new download
         let dir = resolveDefaultDirectory()
         directoryOptions = buildDirectoryOptions(defaultDir: dir)
         selectedDirectory = dir
@@ -150,20 +121,15 @@ final class AddDownloadViewModel {
         state = .newDownload(metadata)
     }
 
-    /// Cancel from any state. Clears all transient state and returns to idle.
     func cancel() {
         queryGeneration += 1
-        currentQueryTask?.cancel()
-        currentQueryTask = nil
         resetState()
     }
 
-    /// Skip a duplicate (dismiss without action).
     func skip() {
         resetState()
     }
 
-    /// Force download from duplicate state (creates new record without mutating existing).
     func forceDownload() async {
         guard case .duplicateFound = state else { return }
 
@@ -198,13 +164,12 @@ final class AddDownloadViewModel {
 
             try await repository.save(record)
         } catch {
-            // Best effort - still reset state
+            // Best effort — still reset state
         }
 
         resetState()
     }
 
-    /// Start a new download from the new download state.
     func startDownload() async {
         guard case .newDownload = state else { return }
 
@@ -240,13 +205,12 @@ final class AddDownloadViewModel {
 
             try await repository.save(record)
         } catch {
-            // Best effort - still reset state
+            // Best effort — still reset state
         }
 
         resetState()
     }
 
-    /// Adds a new directory option to the Picker dropdown and selects it.
     func addBrowsedDirectory(_ path: String) {
         guard !path.isEmpty else { return }
         if !directoryOptions.contains(path) {
@@ -268,10 +232,8 @@ final class AddDownloadViewModel {
         availableDiskSpace = nil
     }
 
-    /// Builds the initial list of directory options, including the default dir and ~/Downloads.
     private func buildDirectoryOptions(defaultDir: String) -> [String] {
-        var options: [String] = []
-        options.append(defaultDir)
+        var options: [String] = [defaultDir]
         let downloadsDir = URL.downloadsDirectory.path()
         if downloadsDir != defaultDir {
             options.append(downloadsDir)
@@ -280,7 +242,12 @@ final class AddDownloadViewModel {
     }
 
     private func resolveDefaultDirectory() -> String {
-        URL.downloadsDirectory.path()
+        let configured = settings.defaultDownloadDir
+        guard !configured.isEmpty,
+              fileManager.fileExists(atPath: configured) else {
+            return URL.downloadsDirectory.path()
+        }
+        return configured
     }
 
     private func refreshDiskSpace() {
@@ -291,7 +258,6 @@ final class AddDownloadViewModel {
         availableDiskSpace = diskSpaceProvider.availableDiskSpace(at: selectedDirectory)
     }
 
-    /// Validates that the given string is a valid http/https URL with a non-empty host.
     private func isValidHTTPURL(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
@@ -302,7 +268,6 @@ final class AddDownloadViewModel {
         return true
     }
 
-    /// Validates a filename is non-empty, has no path separators, and no traversal.
     private func isValidFilename(_ name: String) -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
@@ -311,7 +276,6 @@ final class AddDownloadViewModel {
         return true
     }
 
-    /// Sanitizes a filename to a safe basename.
     private func sanitizeFilename(_ name: String) -> String {
         let basename = (name as NSString).lastPathComponent
         let cleaned = basename

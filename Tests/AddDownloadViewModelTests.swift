@@ -174,8 +174,6 @@ struct AddDownloadViewModelTests {
 
         await vm.submitURL()
 
-        // Should eventually reach newDownload or duplicateFound
-        // The metadata service was called (count > 0 proves URL was used)
         let count = await metaService.getFetchCount()
         #expect(count == 1)
     }
@@ -228,12 +226,10 @@ struct AddDownloadViewModelTests {
         let (vm, _, _) = makeViewModel(metadataService: metaService)
         vm.urlText = "https://example.com/file.zip"
 
-        // Start submit but don't await completion - check state during
         let task = Task { @MainActor in
             await vm.submitURL()
         }
 
-        // Give it a moment to enter querying state
         try? await Task.sleep(for: .milliseconds(50))
 
         guard case .querying = vm.state else {
@@ -316,10 +312,8 @@ struct AddDownloadViewModelTests {
         try? await Task.sleep(for: .milliseconds(50))
         vm.cancel()
 
-        // Wait for the delayed response to arrive
         try? await Task.sleep(for: .milliseconds(300))
 
-        // State should still be idle, not transitioned to newDownload/duplicateFound
         guard case .idle = vm.state else {
             Issue.record("Expected .idle after late completion, got \(vm.state)")
             task.cancel()
@@ -390,7 +384,6 @@ struct AddDownloadViewModelTests {
 
         try? await Task.sleep(for: .milliseconds(50))
 
-        // Try submitting again while already querying
         await vm.submitURL()
 
         task1.cancel()
@@ -414,7 +407,6 @@ struct AddDownloadViewModelTests {
         let metaService = MockURLMetadataService(filename: "file.zip", fileSize: 1024)
         let (vm, _, _) = makeViewModel(metadataService: metaService, repository: repo)
 
-        // Slightly different URL - should NOT be duplicate
         vm.urlText = "https://example.com/file.zip?v=2"
         await vm.submitURL()
 
@@ -448,7 +440,6 @@ struct AddDownloadViewModelTests {
             return
         }
 
-        // Only the original record should exist
         let all = try! await repoUsed.fetchAll()
         #expect(all.count == 1)
     }
@@ -487,22 +478,18 @@ struct AddDownloadViewModelTests {
 
         await vm.forceDownload()
 
-        // State should reset to idle
         guard case .idle = vm.state else {
             Issue.record("Expected .idle after force download, got \(vm.state)")
             return
         }
 
-        // Two records now exist
         let all = try await repoUsed.fetchAll()
         #expect(all.count == 2)
 
-        // Original record is unchanged
         let original = try await repoUsed.fetch(id: existingRecord.id)
         #expect(original?.status == DownloadStatus.completed.rawValue)
         #expect(original?.filePath == "/original/path")
 
-        // aria2 was called
         let addCalls = await aria2.recordedAddCalls()
         #expect(addCalls.count == 1)
     }
@@ -717,13 +704,11 @@ struct AddDownloadViewModelTests {
 
         await vm.startDownload()
 
-        // State should reset
         guard case .idle = vm.state else {
             Issue.record("Expected .idle after download, got \(vm.state)")
             return
         }
 
-        // aria2 was called with correct params
         let addCalls = await aria2.recordedAddCalls()
         #expect(addCalls.count == 1)
         let call = try #require(addCalls.first)
@@ -731,7 +716,6 @@ struct AddDownloadViewModelTests {
         #expect(call.dir == tmpDir)
         #expect(call.outputFileName == "file.zip")
 
-        // Record was saved
         let all = try await repo.fetchAll()
         #expect(all.count == 1)
         let saved = try #require(all.first)
@@ -785,9 +769,7 @@ struct AddDownloadViewModelTests {
 
         #expect(vm.availableDiskSpace == 100_000_000_000)
 
-        // Changing directory should recalculate
         vm.selectedDirectory = "/new/dir"
-        // The disk space should be recalculated via the provider
         #expect(vm.availableDiskSpace == 100_000_000_000) // same fixed value from provider
     }
 
@@ -804,7 +786,6 @@ struct AddDownloadViewModelTests {
 
         vm.editableFilename = "../../../etc/passwd"
 
-        // Should be disabled due to path traversal
         #expect(vm.isDownloadEnabled == false)
     }
 
@@ -830,7 +811,6 @@ struct AddDownloadViewModelTests {
 
         await vm.submitURL()
 
-        // /usr/bin exists but is not writable by normal users
         vm.selectedDirectory = "/usr/bin"
         #expect(vm.isDownloadEnabled == false)
     }
@@ -844,16 +824,13 @@ struct AddDownloadViewModelTests {
 
         await vm.submitURL()
 
-        // Force directory to an unwritable path
         vm.selectedDirectory = "/usr/bin"
 
         await vm.startDownload()
 
-        // aria2 should NOT have been called
         let addCalls = await aria2.recordedAddCalls()
         #expect(addCalls.isEmpty)
 
-        // No record saved
         let all = try! await repo.fetchAll()
         #expect(all.isEmpty)
     }
@@ -885,14 +862,11 @@ struct AddDownloadViewModelTests {
             diskSpaceProvider: dsp
         )
 
-        // Step 1: Enter URL
         vm.urlText = "https://example.com/app.dmg"
         #expect(vm.isOKEnabled == true)
 
-        // Step 2: Submit
         await vm.submitURL()
 
-        // Step 3: Should be in newDownload state
         guard case .newDownload(let metadata) = vm.state else {
             Issue.record("Expected .newDownload, got \(vm.state)")
             return
@@ -903,10 +877,8 @@ struct AddDownloadViewModelTests {
         #expect(vm.selectedDirectory == tmpDir)
         #expect(vm.availableDiskSpace == 100_000_000_000)
 
-        // Step 4: Download
         await vm.startDownload()
 
-        // Step 5: State reset
         guard case .idle = vm.state else {
             Issue.record("Expected .idle after download")
             return
@@ -914,11 +886,9 @@ struct AddDownloadViewModelTests {
         #expect(vm.urlText == "")
         #expect(vm.editableFilename == "")
 
-        // Verify aria2 call
         let addCalls = await aria2.recordedAddCalls()
         #expect(addCalls.count == 1)
 
-        // Verify record saved
         let all = try await repo.fetchAll()
         #expect(all.count == 1)
     }
@@ -940,14 +910,11 @@ struct AddDownloadViewModelTests {
         let metaService = MockURLMetadataService(filename: "dup.zip", fileSize: 2048)
         let (vm, repoUsed, _) = makeViewModel(metadataService: metaService, repository: repo)
 
-        // Enter URL
         vm.urlText = "https://example.com/dup.zip"
         #expect(vm.isOKEnabled == true)
 
-        // Submit
         await vm.submitURL()
 
-        // Should be in duplicateFound state
         guard case .duplicateFound(let record) = vm.state else {
             Issue.record("Expected .duplicateFound, got \(vm.state)")
             return
@@ -955,16 +922,13 @@ struct AddDownloadViewModelTests {
         #expect(record.url == "https://example.com/dup.zip")
         #expect(record.filename == "dup.zip")
 
-        // Skip
         vm.skip()
 
-        // State reset
         guard case .idle = vm.state else {
             Issue.record("Expected .idle after skip")
             return
         }
 
-        // No new record
         let all = try! await repoUsed.fetchAll()
         #expect(all.count == 1)
     }
@@ -1007,15 +971,12 @@ struct AddDownloadViewModelTests {
             return
         }
 
-        // Two records
         let all = try await repoUsed.fetchAll()
         #expect(all.count == 2)
 
-        // Original unchanged
         let original = try await repoUsed.fetch(id: existingRecord.id)
         #expect(original?.status == DownloadStatus.completed.rawValue)
 
-        // aria2 called
         let addCalls = await aria2.recordedAddCalls()
         #expect(addCalls.count == 1)
     }
@@ -1025,7 +986,6 @@ struct AddDownloadViewModelTests {
     @Test @MainActor
     func headFailureFallbackFlow() async throws {
         let tmpDir = NSTemporaryDirectory()
-        // URLMetadataService returns fallback on error (filename from URL, nil size)
         let metaService = MockURLMetadataService(filename: "large.iso", fileSize: nil)
         let aria2 = MockAria2Controller(addResult: "fallback-gid")
         let (vm, repo, _) = makeViewModel(
@@ -1127,12 +1087,10 @@ struct AddDownloadViewModelTests {
             defaultDownloadDir: NSTemporaryDirectory()
         )
 
-        // Complete a download
         vm.urlText = "https://example.com/file.zip"
         await vm.submitURL()
         await vm.startDownload()
 
-        // All state is clean
         guard case .idle = vm.state else {
             Issue.record("Expected .idle")
             return
@@ -1150,7 +1108,6 @@ struct AddDownloadViewModelTests {
         vm.urlText = "not-a-url"
         await vm.submitURL()
 
-        // Should remain idle since URL is invalid
         guard case .idle = vm.state else {
             Issue.record("Expected .idle for invalid URL submit")
             return

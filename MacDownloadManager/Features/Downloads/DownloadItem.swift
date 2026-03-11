@@ -80,7 +80,9 @@ struct DownloadItem: Identifiable, Sendable, Equatable {
         self.downloadedSize = Int64(record.progress * Double(record.fileSize ?? 0))
         self.progress = record.progress
         self.speed = 0
-        self.status = DownloadStatus(rawValue: record.status) ?? .error
+        self.status = URL(string: record.url) != nil
+            ? (DownloadStatus(rawValue: record.status) ?? .error)
+            : .error
         self.segments = record.segments
         self.headers = record.headers
         self.createdAt = record.createdAt

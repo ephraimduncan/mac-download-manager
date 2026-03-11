@@ -65,7 +65,6 @@ struct NewDownloadView: View {
             }
             .font(.caption)
 
-            // Buttons
             HStack {
                 Spacer()
 

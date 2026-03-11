@@ -115,6 +115,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 status: DownloadStatus.downloading.rawValue,
                 segments: 16,
                 headersJSON: headersJSON,
+                filePath: downloadDir,
                 aria2Gid: gid
             )
 
@@ -131,21 +132,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         try? FileManager.default.createDirectory(at: chromeDir, withIntermediateDirectories: true)
 
-        let helperPath = Bundle.main.bundlePath + "/Contents/MacOS/MacDownloadManagerHelper"
+        let helperPath = Bundle.main.bundlePath + "/Contents/MacOS/NativeMessagingHelper"
 
-        let manifest: [String: Any] = [
-            "name": "com.macdownloadmanager.helper",
-            "description": "Mac Download Manager Native Messaging Host",
-            "path": helperPath,
-            "type": "stdio",
-            "allowed_origins": [
-                "chrome-extension://YOUR_EXTENSION_ID/"
-            ]
-        ]
+        struct NativeManifest: Encodable {
+            let name: String
+            let description: String
+            let path: String
+            let type: String
+            let allowed_origins: [String]
+        }
+
+        let manifest = NativeManifest(
+            name: "com.macdownloadmanager.helper",
+            description: "Mac Download Manager Native Messaging Host",
+            path: helperPath,
+            type: "stdio",
+            allowed_origins: ["chrome-extension://YOUR_EXTENSION_ID/"]
+        )
 
         let manifestPath = chromeDir.appendingPathComponent("com.macdownloadmanager.helper.json")
 
-        if let data = try? JSONSerialization.data(withJSONObject: manifest, options: .prettyPrinted) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .prettyPrinted
+        if let data = try? encoder.encode(manifest) {
             try? data.write(to: manifestPath)
         }
     }

@@ -13,6 +13,8 @@ final class SettingsViewModel {
 
     private let aria2: Aria2Client?
 
+    var errorMessage: String?
+
     var fileTypesArray: [String] {
         get { interceptFileTypes.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } }
         set { interceptFileTypes = newValue.joined(separator: ",") }
@@ -69,7 +71,9 @@ final class SettingsViewModel {
         let limitString = maxBandwidth > 0 ? "\(maxBandwidth)K" : "0"
         do {
             try await aria2.changeGlobalOption(options: ["max-overall-download-limit": limitString])
-        } catch {}
+        } catch {
+            errorMessage = "Failed to apply bandwidth limit: \(error.localizedDescription)"
+        }
     }
 
     func resetFilterDefaults() {

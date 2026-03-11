@@ -240,7 +240,11 @@ final class DownloadListViewModel {
     var item = downloads[index]
     mutate(&item)
     downloads[index] = item
-    try? await repository.update(DownloadRecord(item: item))
+    do {
+      try await repository.update(DownloadRecord(item: item))
+    } catch {
+      errorMessage = "Failed to persist update: \(error.localizedDescription)"
+    }
   }
 
   private func fetchAllStatuses() async throws(Aria2Error) -> [Aria2Status] {

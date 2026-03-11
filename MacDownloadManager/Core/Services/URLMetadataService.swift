@@ -9,12 +9,10 @@ protocol URLMetadataService: Sendable {
     func fetchMetadata(for url: URL) async -> URLMetadata
 }
 
-/// Abstraction over URLSession HEAD request for testability.
 protocol HTTPHeadClient: Sendable {
     func head(url: URL, timeoutInterval: TimeInterval) async throws -> (httpResponse: HTTPURLResponse, data: Data)
 }
 
-/// Default implementation using URLSession.
 struct URLSessionHeadClient: HTTPHeadClient {
     private let session: URLSession
 
