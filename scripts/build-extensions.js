@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, rmSync, renameSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -148,6 +148,13 @@ function packageBrowser(browser) {
     `web-ext build --source-dir "${sourceDir}" --artifacts-dir "${artifactsDir}" --overwrite-dest --filename "${filename}"`,
     { stdio: "pipe" }
   );
+
+  // web-ext lowercases the filename; rename to the expected mixed-case name
+  const lowered = join(artifactsDir, filename.toLowerCase());
+  const expected = join(artifactsDir, filename);
+  if (lowered !== expected && existsSync(lowered)) {
+    renameSync(lowered, expected);
+  }
 
   console.log(`Packaged dist/${filename}`);
 }
