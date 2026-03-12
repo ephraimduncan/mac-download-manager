@@ -37,6 +37,7 @@ final class DependencyContainer {
     var menuBarDownloads: [MenuBarDownload] = []
     var globalDownloadSpeed: Int64 = 0
     var pendingExtensionDownload: PendingExtensionDownload?
+    var openMainWindow: (() -> Void)?
 
     var menuBarIcon: String {
         activeDownloadCount > 0 ? "arrow.down.circle.fill" : "arrow.down.circle"

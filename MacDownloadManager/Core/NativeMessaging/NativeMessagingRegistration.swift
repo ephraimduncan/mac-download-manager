@@ -1,25 +1,13 @@
 import Foundation
 
-enum NativeMessagingBrowser: String, CaseIterable, Sendable {
-    case chrome
+enum NativeMessagingBrowserType: Sendable {
+    case chromium
     case firefox
-    case edge
 }
 
-struct BrowserManifestPath: Sendable {
-    let browser: NativeMessagingBrowser
+struct NativeMessagingHostDirectory: Sendable {
+    let type: NativeMessagingBrowserType
     let directory: URL
-}
-
-enum NativeMessagingError: Error, CustomStringConvertible {
-    case serializationFailed(browser: NativeMessagingBrowser, underlying: Error)
-
-    var description: String {
-        switch self {
-        case .serializationFailed(let browser, let underlying):
-            return "Failed to serialize native messaging manifest for \(browser.rawValue): \(underlying.localizedDescription)"
-        }
-    }
 }
 
 enum NativeMessagingRegistration {
@@ -35,44 +23,50 @@ enum NativeMessagingRegistration {
     /// replace this with the store-assigned extension ID.
     private static let chromeExtensionId = "iomcmbjooojnddcbbillnngpdmionlmo"
 
-    /// Chrome allowed origins. Each origin must be in the format
-    /// `chrome-extension://EXTENSION_ID/` with an exact extension ID.
-    /// Chromium does not support wildcards in allowed_origins.
-    static let chromeAllowedOrigins: [String] = [
+    static let chromiumAllowedOrigins: [String] = [
         "chrome-extension://\(chromeExtensionId)/",
     ]
 
-    /// Edge shares the Chromium extension model and uses the same origin format
-    /// and extension ID (both are built from the same public key).
-    static let edgeAllowedOrigins: [String] = [
-        "chrome-extension://\(chromeExtensionId)/",
-    ]
+    /// Scans ~/Library/Application Support/ for any existing NativeMessagingHosts
+    /// directories. Automatically covers every installed Chromium-based browser
+    /// (Chrome, Edge, Brave, Arc, Helium, Vivaldi, Opera, etc.) and Firefox.
+    static func discoverHostDirectories() -> [NativeMessagingHostDirectory] {
+        let appSupport = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support")
 
-    static func browserPaths() -> [BrowserManifestPath] {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        return [
-            BrowserManifestPath(
-                browser: .chrome,
-                directory: home.appendingPathComponent(
-                    "Library/Application Support/Google/Chrome/NativeMessagingHosts"
-                )
-            ),
-            BrowserManifestPath(
-                browser: .firefox,
-                directory: home.appendingPathComponent(
-                    "Library/Application Support/Mozilla/NativeMessagingHosts"
-                )
-            ),
-            BrowserManifestPath(
-                browser: .edge,
-                directory: home.appendingPathComponent(
-                    "Library/Application Support/Microsoft Edge/NativeMessagingHosts"
-                )
-            ),
-        ]
+        guard let enumerator = FileManager.default.enumerator(
+            at: appSupport,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var results: [NativeMessagingHostDirectory] = []
+        let appSupportDepth = appSupport.pathComponents.count
+
+        while let url = enumerator.nextObject() as? URL {
+            let depth = url.pathComponents.count - appSupportDepth
+            if depth > 3 {
+                enumerator.skipDescendants()
+                continue
+            }
+
+            guard url.lastPathComponent == "NativeMessagingHosts",
+                  (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+            else { continue }
+
+            let type: NativeMessagingBrowserType =
+                url.path.contains("Mozilla") ? .firefox : .chromium
+            results.append(NativeMessagingHostDirectory(type: type, directory: url))
+            enumerator.skipDescendants()
+        }
+
+        return results
     }
 
-    static func manifestData(for browser: NativeMessagingBrowser, helperPath: String) throws -> Data {
+    static func manifestData(
+        for browserType: NativeMessagingBrowserType,
+        helperPath: String
+    ) throws(NativeMessagingError) -> Data {
         var dict: [String: Any] = [
             "name": manifestName,
             "description": "Mac Download Manager Native Messaging Host",
@@ -80,11 +74,9 @@ enum NativeMessagingRegistration {
             "type": "stdio",
         ]
 
-        switch browser {
-        case .chrome:
-            dict["allowed_origins"] = chromeAllowedOrigins
-        case .edge:
-            dict["allowed_origins"] = edgeAllowedOrigins
+        switch browserType {
+        case .chromium:
+            dict["allowed_origins"] = chromiumAllowedOrigins
         case .firefox:
             dict["allowed_extensions"] = [firefoxExtensionId]
         }
@@ -95,25 +87,32 @@ enum NativeMessagingRegistration {
                 options: [.prettyPrinted, .sortedKeys]
             )
         } catch {
-            throw NativeMessagingError.serializationFailed(browser: browser, underlying: error)
+            throw .serializationFailed(directory: "unknown", underlying: error)
         }
     }
 
     static func registerAll(helperPath: String) {
-        for entry in browserPaths() {
+        for entry in discoverHostDirectories() {
             do {
-                try FileManager.default.createDirectory(
-                    at: entry.directory,
-                    withIntermediateDirectories: true
-                )
-                let data = try manifestData(for: entry.browser, helperPath: helperPath)
+                let data = try manifestData(for: entry.type, helperPath: helperPath)
                 let manifestFile = entry.directory.appendingPathComponent("\(manifestName).json")
                 try data.write(to: manifestFile)
             } catch {
                 print(
-                    "Failed to register native messaging manifest for \(entry.browser.rawValue): \(error)"
+                    "Failed to register native messaging manifest at \(entry.directory.path): \(error)"
                 )
             }
+        }
+    }
+}
+
+enum NativeMessagingError: Error, CustomStringConvertible {
+    case serializationFailed(directory: String, underlying: Error)
+
+    var description: String {
+        switch self {
+        case .serializationFailed(let directory, let underlying):
+            return "Failed to serialize native messaging manifest for \(directory): \(underlying.localizedDescription)"
         }
     }
 }

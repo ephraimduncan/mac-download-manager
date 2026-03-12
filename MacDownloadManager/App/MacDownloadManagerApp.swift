@@ -16,6 +16,7 @@ struct MacDownloadManagerApp: App {
             DownloadListView()
                 .environment(container)
                 .frame(minWidth: 600, minHeight: 400)
+                .withWindowOpener(container: container)
         }
         .defaultSize(width: 700, height: 500)
         .windowResizability(.contentMinSize)
@@ -32,5 +33,23 @@ struct MacDownloadManagerApp: App {
             SettingsView()
                 .environment(container)
         }
+    }
+}
+
+private struct WindowOpenerModifier: ViewModifier {
+    let container: DependencyContainer
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                container.openMainWindow = { openWindow(id: "main") }
+            }
+    }
+}
+
+extension View {
+    func withWindowOpener(container: DependencyContainer) -> some View {
+        modifier(WindowOpenerModifier(container: container))
     }
 }

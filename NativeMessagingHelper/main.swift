@@ -1,6 +1,8 @@
+import AppKit
 import Foundation
 
 let socketPath = NSHomeDirectory() + "/Library/Application Support/Mac Download Manager/helper.sock"
+let appBundleId = "com.macdownloadmanager.app"
 
 func readNativeMessage(from handle: FileHandle) -> Data? {
     let lengthData = handle.readData(ofLength: 4)
@@ -105,10 +107,66 @@ func writeErrorResponse(_ message: String) {
     }
 }
 
-let socketFD = connectToSocket()
+func launchAppIfNeeded() {
+    let workspace = NSWorkspace.shared
+    if workspace.runningApplications.contains(where: { $0.bundleIdentifier == appBundleId }) {
+        return
+    }
+    guard let appURL = workspace.urlForApplication(withBundleIdentifier: appBundleId) else {
+        return
+    }
+    let config = NSWorkspace.OpenConfiguration()
+    config.activates = false
+    workspace.openApplication(at: appURL, configuration: config, completionHandler: nil)
+}
+
+func startSocketReader(fd: Int32) {
+    let socketSource = DispatchSource.makeReadSource(fileDescriptor: fd, queue: .main)
+    socketSource.setEventHandler {
+        guard let data = readSocketFrame(fd: fd) else {
+            socketSource.cancel()
+            return
+        }
+        writeNativeMessage(data, to: FileHandle.standardOutput)
+    }
+    socketSource.setCancelHandler {
+        close(fd)
+    }
+    socketSource.resume()
+}
+
+nonisolated(unsafe) var socketFD = connectToSocket()
+nonisolated(unsafe) var pendingMessages: [Data] = []
 
 if socketFD < 0 {
-    writeErrorResponse("Mac Download Manager is not running")
+    launchAppIfNeeded()
+
+    var retryCount = 0
+    let retryTimer = DispatchSource.makeTimerSource(queue: .main)
+    retryTimer.schedule(deadline: .now() + 1, repeating: 1.0)
+    retryTimer.setEventHandler {
+        retryCount += 1
+        let fd = connectToSocket()
+        if fd >= 0 {
+            socketFD = fd
+            startSocketReader(fd: fd)
+            for msg in pendingMessages {
+                writeSocketFrame(msg, to: fd)
+            }
+            pendingMessages.removeAll()
+            retryTimer.cancel()
+        } else if retryCount >= 10 {
+            for _ in pendingMessages {
+                writeErrorResponse("Mac Download Manager is not running")
+            }
+            pendingMessages.removeAll()
+            retryTimer.cancel()
+            exit(1)
+        }
+    }
+    retryTimer.resume()
+} else {
+    startSocketReader(fd: socketFD)
 }
 
 let stdinSource = DispatchSource.makeReadSource(fileDescriptor: FileHandle.standardInput.fileDescriptor, queue: .main)
@@ -120,32 +178,16 @@ stdinSource.setEventHandler {
         return
     }
 
-    if socketFD < 0 {
-        writeErrorResponse("Mac Download Manager is not running")
-        return
+    if socketFD >= 0 {
+        writeSocketFrame(data, to: socketFD)
+    } else {
+        pendingMessages.append(data)
     }
-
-    writeSocketFrame(data, to: socketFD)
 }
 stdinSource.setCancelHandler {
     if socketFD >= 0 { close(socketFD) }
     exit(0)
 }
 stdinSource.resume()
-
-if socketFD >= 0 {
-    let socketSource = DispatchSource.makeReadSource(fileDescriptor: socketFD, queue: .main)
-    socketSource.setEventHandler {
-        guard let data = readSocketFrame(fd: socketFD) else {
-            socketSource.cancel()
-            return
-        }
-        writeNativeMessage(data, to: FileHandle.standardOutput)
-    }
-    socketSource.setCancelHandler {
-        close(socketFD)
-    }
-    socketSource.resume()
-}
 
 dispatchMain()

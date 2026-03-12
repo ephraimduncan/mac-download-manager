@@ -113,14 +113,14 @@ enum DownloadStatus: String, Codable, Sendable, CaseIterable, Comparable {
 }
 
 enum FilterOption: String, CaseIterable, Sendable {
-    case active, completed, paused, all
+    case all, active, completed, paused
 
     var displayName: String {
         switch self {
+        case .all: "All"
         case .active: "Active"
         case .completed: "Completed"
         case .paused: "Paused"
-        case .all: "All"
         }
     }
 }

@@ -95,6 +95,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if let window = NSApp.windows.first(where: { $0.title == "Mac Download Manager" }) ?? NSApp.windows.first(where: { !$0.isMiniaturized }) {
             window.makeKeyAndOrderFront(nil)
+        } else {
+            container.openMainWindow?()
         }
 
         return NativeResponse(accepted: true, error: nil, activeCount: container.activeDownloadCount)

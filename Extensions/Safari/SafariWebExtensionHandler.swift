@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SafariServices
 
@@ -5,6 +6,7 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
 
     private static let appGroupId = "group.com.macdownloadmanager"
     private static let pendingDownloadsKey = "pendingDownloads"
+    private static let appBundleId = "com.macdownloadmanager.app"
 
     func beginRequest(with context: NSExtensionContext) {
         guard let item = context.inputItems.first as? NSExtensionItem,
@@ -46,6 +48,7 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         ]
 
         writeDownloadRequest(downloadRequest)
+        launchContainingAppIfNeeded()
 
         let response = NSExtensionItem()
         response.userInfo = [SFExtensionMessageKey: ["status": "received"]]
@@ -67,5 +70,19 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             as? [[String: Any]] ?? []
         pending.append(request)
         defaults.set(pending, forKey: SafariWebExtensionHandler.pendingDownloadsKey)
+    }
+
+    private func launchContainingAppIfNeeded() {
+        let workspace = NSWorkspace.shared
+        let isRunning = workspace.runningApplications.contains {
+            $0.bundleIdentifier == SafariWebExtensionHandler.appBundleId
+        }
+        guard !isRunning else { return }
+        guard let appURL = workspace.urlForApplication(withBundleIdentifier: SafariWebExtensionHandler.appBundleId) else {
+            return
+        }
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = true
+        workspace.openApplication(at: appURL, configuration: config, completionHandler: nil)
     }
 }

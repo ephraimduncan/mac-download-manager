@@ -1139,4 +1139,190 @@ struct AddDownloadViewModelTests {
         let call = try #require(addCalls.first)
         #expect(call.segments == 16)
     }
+
+    // MARK: - Intercepted message prefill tests
+
+    @Test @MainActor
+    func prefillMessageSetsURLText() {
+        let (vm, _, _) = makeViewModel()
+        let msg = NativeMessage(
+            url: "https://example.com/file.zip",
+            headers: ["cookie": "session=abc"],
+            filename: "file.zip",
+            fileSize: 1024,
+            referrer: "https://example.com/"
+        )
+        vm.prefill(message: msg)
+        #expect(vm.urlText == "https://example.com/file.zip")
+    }
+
+    @Test @MainActor
+    func startDownloadPassesInterceptedHeaders() async throws {
+        let tmpDir = NSTemporaryDirectory()
+        let metaService = MockURLMetadataService(filename: "file.zip", fileSize: 1024)
+        let aria2 = MockAria2Controller(addResult: "header-gid")
+        let (vm, _, _) = makeViewModel(
+            metadataService: metaService,
+            aria2: aria2,
+            defaultDownloadDir: tmpDir
+        )
+        let msg = NativeMessage(
+            url: "https://example.com/file.zip",
+            headers: ["cookie": "session=abc", "authorization": "Bearer tok"],
+            filename: "file.zip",
+            fileSize: 1024,
+            referrer: "https://example.com/page"
+        )
+        vm.prefill(message: msg)
+
+        await vm.submitURL()
+        await vm.startDownload()
+
+        let addCalls = await aria2.recordedAddCalls()
+        let call = try #require(addCalls.first)
+        #expect(call.headers["cookie"] == "session=abc")
+        #expect(call.headers["authorization"] == "Bearer tok")
+        #expect(call.headers["Referer"] == "https://example.com/page")
+    }
+
+    @Test @MainActor
+    func forceDownloadPassesInterceptedHeaders() async throws {
+        let repo = InMemoryDownloadRepository()
+        let existingRecord = DownloadRecord(
+            url: "https://example.com/file.zip",
+            filename: "file.zip",
+            fileSize: 1024,
+            status: DownloadStatus.completed.rawValue
+        )
+        try await repo.save(existingRecord)
+
+        let metaService = MockURLMetadataService(filename: "file.zip", fileSize: 1024)
+        let aria2 = MockAria2Controller(addResult: "dup-header-gid")
+        let (vm, _, _) = makeViewModel(
+            metadataService: metaService,
+            repository: repo,
+            aria2: aria2,
+            defaultDownloadDir: NSTemporaryDirectory()
+        )
+
+        let msg = NativeMessage(
+            url: "https://example.com/file.zip",
+            headers: ["cookie": "session=xyz"],
+            filename: "file.zip",
+            fileSize: 1024,
+            referrer: "https://example.com/ref"
+        )
+        vm.prefill(message: msg)
+
+        await vm.submitURL()
+
+        guard case .duplicateFound = vm.state else {
+            Issue.record("Expected .duplicateFound")
+            return
+        }
+
+        await vm.forceDownload()
+
+        let addCalls = await aria2.recordedAddCalls()
+        let call = try #require(addCalls.first)
+        #expect(call.headers["cookie"] == "session=xyz")
+        #expect(call.headers["Referer"] == "https://example.com/ref")
+    }
+
+    @Test @MainActor
+    func interceptedFilenameUsedWhenMetadataReturnsGeneric() async {
+        let metaService = MockURLMetadataService(filename: "download", fileSize: nil)
+        let (vm, _, _) = makeViewModel(
+            metadataService: metaService,
+            defaultDownloadDir: NSTemporaryDirectory()
+        )
+        let msg = NativeMessage(
+            url: "https://example.com/file",
+            headers: nil,
+            filename: "report.pdf",
+            fileSize: 5000,
+            referrer: nil
+        )
+        vm.prefill(message: msg)
+
+        await vm.submitURL()
+
+        guard case .newDownload(let metadata) = vm.state else {
+            Issue.record("Expected .newDownload, got \(vm.state)")
+            return
+        }
+        #expect(vm.editableFilename == "report.pdf")
+        #expect(metadata.fileSize == 5000)
+    }
+
+    @Test @MainActor
+    func interceptedFileSizeUsedWhenMetadataHasNoSize() async {
+        let metaService = MockURLMetadataService(filename: "doc.pdf", fileSize: nil)
+        let (vm, _, _) = makeViewModel(
+            metadataService: metaService,
+            defaultDownloadDir: NSTemporaryDirectory()
+        )
+        let msg = NativeMessage(
+            url: "https://example.com/doc.pdf",
+            headers: nil,
+            filename: nil,
+            fileSize: 2048,
+            referrer: nil
+        )
+        vm.prefill(message: msg)
+
+        await vm.submitURL()
+
+        guard case .newDownload(let metadata) = vm.state else {
+            Issue.record("Expected .newDownload, got \(vm.state)")
+            return
+        }
+        #expect(metadata.fileSize == 2048)
+    }
+
+    @Test @MainActor
+    func metadataFilenamePreferredOverInterceptedWhenNotGeneric() async {
+        let metaService = MockURLMetadataService(filename: "server-name.zip", fileSize: 4096)
+        let (vm, _, _) = makeViewModel(
+            metadataService: metaService,
+            defaultDownloadDir: NSTemporaryDirectory()
+        )
+        let msg = NativeMessage(
+            url: "https://example.com/server-name.zip",
+            headers: nil,
+            filename: "browser-name.zip",
+            fileSize: 1024,
+            referrer: nil
+        )
+        vm.prefill(message: msg)
+
+        await vm.submitURL()
+
+        guard case .newDownload(let metadata) = vm.state else {
+            Issue.record("Expected .newDownload, got \(vm.state)")
+            return
+        }
+        #expect(vm.editableFilename == "server-name.zip")
+        #expect(metadata.fileSize == 4096)
+    }
+
+    @Test @MainActor
+    func noInterceptedMessagePassesEmptyHeaders() async throws {
+        let tmpDir = NSTemporaryDirectory()
+        let metaService = MockURLMetadataService(filename: "file.zip", fileSize: 1024)
+        let aria2 = MockAria2Controller(addResult: "no-headers-gid")
+        let (vm, _, _) = makeViewModel(
+            metadataService: metaService,
+            aria2: aria2,
+            defaultDownloadDir: tmpDir
+        )
+        vm.prefill(url: "https://example.com/file.zip")
+
+        await vm.submitURL()
+        await vm.startDownload()
+
+        let addCalls = await aria2.recordedAddCalls()
+        let call = try #require(addCalls.first)
+        #expect(call.headers.isEmpty)
+    }
 }

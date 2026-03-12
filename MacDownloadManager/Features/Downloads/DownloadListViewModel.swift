@@ -16,7 +16,7 @@ final class DownloadListViewModel {
 
   var downloads: [DownloadItem] = []
   var searchText = ""
-  var filterOption: FilterOption = .active
+  var filterOption: FilterOption = .all
   var errorMessage: String?
   var isAddURLPresented = false
   var selectedDownloadIDs: Set<UUID> = []
