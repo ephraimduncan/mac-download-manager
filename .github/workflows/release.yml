@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build-app:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build aria2c
+        run: ./scripts/build-aria2.sh
+
+      - name: Build app
+        run: |
+          xcodebuild -scheme MacDownloadManager \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Create DMG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          APP_PATH="build/Build/Products/Release/Mac Download Manager.app"
+          DMG_NAME="MacDownloadManager-${VERSION}.dmg"
+
+          mkdir -p dmg-staging
+          cp -R "$APP_PATH" dmg-staging/
+          ln -s /Applications dmg-staging/Applications
+
+          hdiutil create -volname "Mac Download Manager" \
+            -srcfolder dmg-staging \
+            -ov -format UDRW \
+            "tmp.dmg"
+
+          MOUNT_DIR=$(hdiutil attach "tmp.dmg" -noverify | grep '/Volumes/' | awk -F'\t' '{print $NF}')
+
+          osascript <<EOF
+          tell application "Finder"
+            tell disk "Mac Download Manager"
+              open
+              set current view of container window to icon view
+              set toolbar visible of container window to false
+              set statusbar visible of container window to false
+              set bounds of container window to {400, 100, 920, 440}
+              set theViewOptions to the icon view options of container window
+              set arrangement of theViewOptions to not arranged
+              set icon size of theViewOptions to 80
+              set position of item "Mac Download Manager.app" of container window to {130, 150}
+              set position of item "Applications" of container window to {390, 150}
+              close
+            end tell
+          end tell
+          EOF
+
+          sync
+          hdiutil detach "$MOUNT_DIR"
+          hdiutil convert "tmp.dmg" -format UDZO -o "${DMG_NAME}"
+          rm -f tmp.dmg
+
+          echo "DMG_NAME=${DMG_NAME}" >> "$GITHUB_ENV"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg
+          path: ${{ env.DMG_NAME }}
+
+  build-extensions:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build browser extensions
+        env:
+          RELEASE_VERSION: ${{ github.event.release.tag_name }}
+        run: bun run build
+
+      - name: Upload Chrome extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension
+          path: dist/MacDownloadManager-ChromeExtension-*.zip
+
+      - name: Upload Firefox extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-extension
+          path: dist/MacDownloadManager-FirefoxExtension-*.zip
+
+      - name: Upload Edge extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-extension
+          path: dist/MacDownloadManager-EdgeExtension-*.zip
+
+  upload-assets:
+    needs: [build-app, build-extensions]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            artifacts/*.dmg \
+            artifacts/*.zip

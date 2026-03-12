@@ -3,10 +3,6 @@ name: Build Extensions
 on:
   push:
     branches: [main]
-    tags: ['v*']
-
-permissions:
-  contents: write
 
 jobs:
   build-extensions:
@@ -28,94 +24,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: chrome-extension
-          path: dist/chrome.zip
+          path: dist/MacDownloadManager-ChromeExtension-*.zip
 
       - name: Upload Firefox extension
         uses: actions/upload-artifact@v4
         with:
           name: firefox-extension
-          path: dist/firefox.zip
+          path: dist/MacDownloadManager-FirefoxExtension-*.zip
 
       - name: Upload Edge extension
         uses: actions/upload-artifact@v4
         with:
           name: edge-extension
-          path: dist/edge.zip
-
-  build-safari:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Xcode project
-        run: xcodegen generate
-
-      - name: Build Safari extension
-        run: |
-          xcodebuild -scheme MacDownloadManager \
-            -configuration Release \
-            -derivedDataPath build \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            build
-
-      - name: Package Safari extension
-        run: |
-          mkdir -p dist
-          APP_PATH=$(find build/Build/Products/Release -name "*.app" -maxdepth 1 | head -1)
-          cd "$(dirname "$APP_PATH")"
-          zip -r "$GITHUB_WORKSPACE/dist/safari.zip" "$(basename "$APP_PATH")"
-
-      - name: Upload Safari extension
-        uses: actions/upload-artifact@v4
-        with:
-          name: safari-extension
-          path: dist/safari.zip
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-extensions, build-safari]
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download Chrome extension
-        uses: actions/download-artifact@v4
-        with:
-          name: chrome-extension
-          path: artifacts
-
-      - name: Download Firefox extension
-        uses: actions/download-artifact@v4
-        with:
-          name: firefox-extension
-          path: artifacts
-
-      - name: Download Edge extension
-        uses: actions/download-artifact@v4
-        with:
-          name: edge-extension
-          path: artifacts
-
-      - name: Download Safari extension
-        uses: actions/download-artifact@v4
-        with:
-          name: safari-extension
-          path: artifacts
-
-      - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release create "${{ github.ref_name }}" \
-            artifacts/chrome.zip \
-            artifacts/firefox.zip \
-            artifacts/edge.zip \
-            artifacts/safari.zip \
-            --title "Release ${{ github.ref_name }}" \
-            --generate-notes
+          path: dist/MacDownloadManager-EdgeExtension-*.zip

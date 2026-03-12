@@ -135,16 +135,21 @@ function buildBrowser(browser) {
   console.log(`Built ${browser} extension in dist/${browser}/`);
 }
 
+function browserLabel(browser) {
+  return browser.charAt(0).toUpperCase() + browser.slice(1);
+}
+
 function packageBrowser(browser) {
   const sourceDir = join(DIST_DIR, browser);
   const artifactsDir = DIST_DIR;
+  const filename = `MacDownloadManager-${browserLabel(browser)}Extension-${VERSION}.zip`;
 
   execSync(
-    `web-ext build --source-dir "${sourceDir}" --artifacts-dir "${artifactsDir}" --overwrite-dest --filename "${browser}.zip"`,
+    `web-ext build --source-dir "${sourceDir}" --artifacts-dir "${artifactsDir}" --overwrite-dest --filename "${filename}"`,
     { stdio: "pipe" }
   );
 
-  console.log(`Packaged dist/${browser}.zip`);
+  console.log(`Packaged dist/${filename}`);
 }
 
 function build() {

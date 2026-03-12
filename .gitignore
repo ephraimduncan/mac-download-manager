@@ -13,3 +13,6 @@ scripts/.cache/
 .factory/
 dist/
 node_modules/
+*.dmg
+build/
+dmg-staging/
