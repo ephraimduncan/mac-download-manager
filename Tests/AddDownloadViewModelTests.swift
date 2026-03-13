@@ -277,8 +277,7 @@ struct AddDownloadViewModelTests {
         let (vm, repoUsed, _) = makeViewModel(
             metadataService: metaService,
             repository: repo,
-            aria2: aria2,
-            defaultDownloadDir: NSTemporaryDirectory()
+            aria2: aria2
         )
         vm.urlText = "https://example.com/file.zip"
 
@@ -304,13 +303,12 @@ struct AddDownloadViewModelTests {
 
     @Test @MainActor
     func downloadInitiatesAria2AndSavesRecord() async throws {
-        let tmpDir = NSTemporaryDirectory()
+        let expectedDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!.path()
         let metaService = MockURLMetadataService(filename: "file.zip", fileSize: 1024)
         let aria2 = MockAria2Controller(addResult: "new-gid-123")
         let (vm, repo, _) = makeViewModel(
             metadataService: metaService,
-            aria2: aria2,
-            defaultDownloadDir: tmpDir
+            aria2: aria2
         )
         vm.urlText = "https://example.com/file.zip"
 
@@ -326,7 +324,7 @@ struct AddDownloadViewModelTests {
         #expect(addCalls.count == 1)
         let call = try #require(addCalls.first)
         #expect(call.url == URL(string: "https://example.com/file.zip"))
-        #expect(call.dir == tmpDir)
+        #expect(call.dir == expectedDir)
         #expect(call.outputFileName == "file.zip")
 
         let all = try await repo.fetchAll()
@@ -338,20 +336,19 @@ struct AddDownloadViewModelTests {
 
     @Test @MainActor
     func downloadWithCustomFilenameAndDirectory() async throws {
-        let tmpDir = NSTemporaryDirectory()
+        let customDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!.path()
         let metaService = MockURLMetadataService(filename: "original.zip", fileSize: 1024)
         let aria2 = MockAria2Controller(addResult: "custom-gid")
         let (vm, repo, _) = makeViewModel(
             metadataService: metaService,
-            aria2: aria2,
-            defaultDownloadDir: tmpDir
+            aria2: aria2
         )
         vm.urlText = "https://example.com/original.zip"
 
         await vm.submitURL()
 
         vm.editableFilename = "renamed.zip"
-        vm.selectedDirectory = tmpDir
+        vm.selectedDirectory = customDir
 
         await vm.startDownload()
 
@@ -362,6 +359,21 @@ struct AddDownloadViewModelTests {
         let all = try await repo.fetchAll()
         let saved = try #require(all.first)
         #expect(saved.filename == "renamed.zip")
+    }
+
+    @Test @MainActor
+    func fallsBackToDownloadsDirectoryWhenSettingsPathIsTemp() async {
+        let metaService = MockURLMetadataService(filename: "file.zip", fileSize: 1024)
+        let (vm, _, _) = makeViewModel(
+            metadataService: metaService,
+            defaultDownloadDir: NSTemporaryDirectory()
+        )
+        vm.urlText = "https://example.com/file.zip"
+
+        await vm.submitURL()
+
+        let expectedDir = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!.path()
+        #expect(vm.selectedDirectory == expectedDir)
     }
 
     @Test @MainActor
@@ -396,8 +408,6 @@ struct AddDownloadViewModelTests {
         let aria2 = MockAria2Controller(addResult: "test-gid")
         let settings = SettingsViewModel()
         settings.defaultSegments = 16
-        settings.defaultDownloadDir = NSTemporaryDirectory()
-
         let repo = InMemoryDownloadRepository()
         let vm = AddDownloadViewModel(
             metadataService: metaService,
@@ -418,13 +428,11 @@ struct AddDownloadViewModelTests {
 
     @Test @MainActor
     func startDownloadPassesInterceptedHeaders() async throws {
-        let tmpDir = NSTemporaryDirectory()
         let metaService = MockURLMetadataService(filename: "file.zip", fileSize: 1024)
         let aria2 = MockAria2Controller(addResult: "header-gid")
         let (vm, _, _) = makeViewModel(
             metadataService: metaService,
-            aria2: aria2,
-            defaultDownloadDir: tmpDir
+            aria2: aria2
         )
         let msg = NativeMessage(
             url: "https://example.com/file.zip",
@@ -461,8 +469,7 @@ struct AddDownloadViewModelTests {
         let (vm, _, _) = makeViewModel(
             metadataService: metaService,
             repository: repo,
-            aria2: aria2,
-            defaultDownloadDir: NSTemporaryDirectory()
+            aria2: aria2
         )
 
         let msg = NativeMessage(
@@ -492,8 +499,7 @@ struct AddDownloadViewModelTests {
     func interceptedFilenameUsedWhenMetadataReturnsGeneric() async {
         let metaService = MockURLMetadataService(filename: "download", fileSize: nil)
         let (vm, _, _) = makeViewModel(
-            metadataService: metaService,
-            defaultDownloadDir: NSTemporaryDirectory()
+            metadataService: metaService
         )
         let msg = NativeMessage(
             url: "https://example.com/file",
@@ -518,8 +524,7 @@ struct AddDownloadViewModelTests {
     func metadataFilenamePreferredOverInterceptedWhenNotGeneric() async {
         let metaService = MockURLMetadataService(filename: "server-name.zip", fileSize: 4096)
         let (vm, _, _) = makeViewModel(
-            metadataService: metaService,
-            defaultDownloadDir: NSTemporaryDirectory()
+            metadataService: metaService
         )
         let msg = NativeMessage(
             url: "https://example.com/server-name.zip",
@@ -542,13 +547,11 @@ struct AddDownloadViewModelTests {
 
     @Test @MainActor
     func noInterceptedMessagePassesEmptyHeaders() async throws {
-        let tmpDir = NSTemporaryDirectory()
         let metaService = MockURLMetadataService(filename: "file.zip", fileSize: 1024)
         let aria2 = MockAria2Controller(addResult: "no-headers-gid")
         let (vm, _, _) = makeViewModel(
             metadataService: metaService,
-            aria2: aria2,
-            defaultDownloadDir: tmpDir
+            aria2: aria2
         )
         vm.prefill(url: "https://example.com/file.zip")
 

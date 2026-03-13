@@ -110,7 +110,7 @@ final class AddDownloadViewModel {
         guard generation == queryGeneration, case .querying = state else { return }
 
         let dir = resolveDefaultDirectory()
-        directoryOptions = buildDirectoryOptions(defaultDir: dir)
+        directoryOptions = await buildDirectoryOptions(defaultDir: dir)
         selectedDirectory = dir
 
         var filename = metadata.filename
@@ -270,22 +270,49 @@ final class AddDownloadViewModel {
         return headers
     }
 
-    private func buildDirectoryOptions(defaultDir: String) -> [String] {
+    private func buildDirectoryOptions(defaultDir: String) async -> [String] {
         var options: [String] = [defaultDir]
         let downloadsDir = URL.downloadsDirectory.path()
-        if downloadsDir != defaultDir {
-            options.append(downloadsDir)
+        if downloadsDir != defaultDir, !options.contains(downloadsDir) {
+            options.insert(downloadsDir, at: 0)
+        }
+
+        let recentDirs = await recentDownloadDirectories()
+        for dir in recentDirs where !options.contains(dir) {
+            options.append(dir)
         }
         return options
+    }
+
+    private func recentDownloadDirectories() async -> [String] {
+        guard let records = try? await repository.fetchAll() else { return [] }
+        var seen = Set<String>()
+        var dirs: [String] = []
+        for record in records.reversed() {
+            guard let path = record.filePath,
+                  !path.isEmpty,
+                  !isTemporaryPath(path),
+                  !seen.contains(path),
+                  fileManager.fileExists(atPath: path) else { continue }
+            seen.insert(path)
+            dirs.append(path)
+            if dirs.count >= 5 { break }
+        }
+        return dirs
     }
 
     private func resolveDefaultDirectory() -> String {
         let configured = settings.defaultDownloadDir
         guard !configured.isEmpty,
-              fileManager.fileExists(atPath: configured) else {
+              fileManager.fileExists(atPath: configured),
+              !isTemporaryPath(configured) else {
             return URL.downloadsDirectory.path()
         }
         return configured
+    }
+
+    private func isTemporaryPath(_ path: String) -> Bool {
+        path.hasPrefix("/var/") || path.hasPrefix("/tmp/") || path.hasPrefix("/private/var/") || path.hasPrefix("/private/tmp/")
     }
 
     private func refreshDiskSpace() {
