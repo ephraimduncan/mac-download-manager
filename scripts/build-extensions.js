@@ -30,8 +30,6 @@ const CHROME_EXTENSION_KEY =
   "3s2PVEx3LZ5nmh1q54Ow4ozvWwG8i3XnciFhDjPsy8C/mDuz0EbVBwuK4/fzgkXT" +
   "6QIDAQAB";
 
-// Extension ID derived from SHA-256 of the above public key.
-// First 16 bytes, each nibble mapped to a–p.
 const CHROME_EXTENSION_ID = "iomcmbjooojnddcbbillnngpdmionlmo";
 
 const SOURCE_FILES = [

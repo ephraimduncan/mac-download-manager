@@ -14,9 +14,7 @@ function getUrlExtension(url) {
         return ext;
       }
     }
-  } catch {
-    // Invalid URL
-  }
+  } catch {}
   return null;
 }
 

@@ -59,8 +59,6 @@ final class DefaultURLMetadataService: URLMetadataService {
         }
     }
 
-    // MARK: - Private
-
     private func fallbackMetadata(for url: URL) -> URLMetadata {
         URLMetadata(filename: sanitizeFilename(url.suggestedFilename), fileSize: nil)
     }
@@ -79,7 +77,7 @@ final class DefaultURLMetadataService: URLMetadataService {
             $0.trimmingCharacters(in: .whitespaces)
         }
 
-        // filename* (RFC 5987) takes priority
+        // RFC 5987
         for part in parts {
             if part.lowercased().hasPrefix("filename*=") {
                 let raw = String(part.dropFirst("filename*=".count))
@@ -92,7 +90,6 @@ final class DefaultURLMetadataService: URLMetadataService {
             }
         }
 
-        // Regular filename parameter
         for part in parts {
             if part.lowercased().hasPrefix("filename=") {
                 let raw = String(part.dropFirst("filename=".count))
@@ -135,10 +132,8 @@ final class DefaultURLMetadataService: URLMetadataService {
         // correctly handles Windows-style paths like '..\..\secret.txt'
         let normalized = name.replacingOccurrences(of: "\\", with: "/")
 
-        // Take only the last path component to strip directory paths
         let basename = (normalized as NSString).lastPathComponent
 
-        // Remove path traversal components
         let cleaned = basename
             .replacingOccurrences(of: "..", with: "")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))

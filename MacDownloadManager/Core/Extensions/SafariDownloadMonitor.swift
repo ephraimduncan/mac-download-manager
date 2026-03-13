@@ -1,8 +1,5 @@
 import Foundation
 
-/// Monitors the App Group shared container for download requests from the Safari extension.
-/// The Safari Web Extension handler writes download requests to shared UserDefaults,
-/// and this monitor polls for pending requests and forwards them to the main app.
 @MainActor
 final class SafariDownloadMonitor {
 

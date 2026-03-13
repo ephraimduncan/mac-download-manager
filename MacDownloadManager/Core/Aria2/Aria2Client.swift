@@ -132,8 +132,6 @@ actor Aria2Client: DownloadManagingAria2 {
         let _: String = try await call(method: "aria2.changeGlobalOption", params: params)
     }
 
-    // MARK: - Private
-
     private var tokenParam: String { "token:\(secret)" }
 
     private func nextRequestId() -> String {

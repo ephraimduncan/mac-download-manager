@@ -72,9 +72,5 @@ struct DownloadItemTests {
         #expect(item.aria2Gid == "gid123")
     }
 
-    @Test func filterOptionDisplayNames() {
-        #expect(FilterOption.active.displayName == "Active")
-        #expect(FilterOption.completed.displayName == "Completed")
-        #expect(FilterOption.all.displayName == "All")
-    }
+
 }

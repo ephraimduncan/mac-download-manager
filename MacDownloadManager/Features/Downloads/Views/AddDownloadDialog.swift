@@ -45,8 +45,6 @@ struct AddDownloadDialog: View {
         .frame(width: 480)
     }
 
-    // MARK: - Idle State
-
     private var idleContent: some View {
         VStack(spacing: 16) {
             Text("Enter URL")
@@ -79,8 +77,6 @@ struct AddDownloadDialog: View {
         }
         .padding(20)
     }
-
-    // MARK: - Querying State
 
     private var queryingContent: some View {
         VStack(spacing: 16) {

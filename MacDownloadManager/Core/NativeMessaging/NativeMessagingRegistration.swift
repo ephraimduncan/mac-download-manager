@@ -14,22 +14,15 @@ enum NativeMessagingRegistration {
 
     private static let manifestName = "com.macdownloadmanager.helper"
 
-    /// Firefox extension ID matching gecko.id in the Firefox manifest.
     private static let firefoxExtensionId = "macdownloadmanager@example.com"
 
-    /// Development extension ID derived from the deterministic public key
-    /// embedded in Chrome/Edge manifest.json (see scripts/build-extensions.js).
-    /// When the extension is published to the Chrome Web Store or Edge Add-ons,
-    /// replace this with the store-assigned extension ID.
+    // TODO: replace with store-assigned ID after publishing
     private static let chromeExtensionId = "iomcmbjooojnddcbbillnngpdmionlmo"
 
     static let chromiumAllowedOrigins: [String] = [
         "chrome-extension://\(chromeExtensionId)/",
     ]
 
-    /// Scans ~/Library/Application Support/ for any existing NativeMessagingHosts
-    /// directories. Automatically covers every installed Chromium-based browser
-    /// (Chrome, Edge, Brave, Arc, Helium, Vivaldi, Opera, etc.) and Firefox.
     static func discoverHostDirectories() -> [NativeMessagingHostDirectory] {
         let appSupport = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support")
