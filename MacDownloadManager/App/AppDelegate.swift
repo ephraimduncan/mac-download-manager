@@ -48,16 +48,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startAria2() {
-        let downloadDir = URL.downloadsDirectory.path(percentEncoded: false)
-        do {
-            try container.processManager.launch(
-                secret: container.aria2Secret,
-                port: container.aria2Port,
-                downloadDir: downloadDir,
-                maxConcurrent: 5
-            )
-        } catch {
-            print("Failed to launch aria2c: \(error)")
+        Task {
+            let downloadDir = URL.downloadsDirectory.path(percentEncoded: false)
+            do {
+                try await container.processManager.launch(
+                    secret: container.aria2Secret,
+                    port: container.aria2Port,
+                    downloadDir: downloadDir,
+                    maxConcurrent: 5
+                )
+            } catch {
+                print("Failed to launch aria2c: \(error)")
+            }
         }
     }
 

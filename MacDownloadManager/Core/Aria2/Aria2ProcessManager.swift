@@ -25,8 +25,13 @@ final class Aria2ProcessManager {
         port: Int,
         downloadDir: String,
         maxConcurrent: Int
-    ) throws {
-        killStaleProcesses()
+    ) async throws {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                self.killStaleProcesses()
+                continuation.resume()
+            }
+        }
 
         let binaryPath = Self.findBinary()
         guard let binaryPath else {
@@ -56,8 +61,11 @@ final class Aria2ProcessManager {
         do {
             try writePidFile(pid: process.processIdentifier)
         } catch {
-            process.terminate()
-            process.waitUntilExit()
+            let capturedProcess = process
+            DispatchQueue.global(qos: .utility).async {
+                capturedProcess.terminate()
+                capturedProcess.waitUntilExit()
+            }
             throw error
         }
         self.process = process
@@ -130,16 +138,19 @@ final class Aria2ProcessManager {
                 if !Self.isAria2Process(pid: pid) { break }
                 Thread.sleep(forTimeInterval: 0.05)
             }
-            if Self.isAria2Process(pid: pid) { return }
+            guard !Self.isAria2Process(pid: pid) else { return }
         }
         removePidFile()
     }
 
     func terminate() {
         guard let process, process.isRunning else { return }
-        process.terminate()
-        process.waitUntilExit()
         self.process = nil
+        let capturedProcess = process
+        DispatchQueue.global(qos: .userInitiated).async {
+            capturedProcess.terminate()
+            capturedProcess.waitUntilExit()
+        }
     }
 
     private static func isAria2Process(pid: Int32) -> Bool {
