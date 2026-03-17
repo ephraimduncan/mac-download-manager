@@ -105,9 +105,19 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
     const headers = { ...(cached?.headers || {}) };
     if (!headers.cookie) {
       try {
-        const cookies = await chrome.cookies.getAll({ url });
-        if (cookies.length > 0) {
-          headers.cookie = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+        const granted = await new Promise((resolve) =>
+          chrome.permissions.request({ permissions: ["cookies"] }, resolve)
+        );
+        if (granted) {
+          const cookies = await new Promise((resolve) =>
+            chrome.cookies.getAll({ url }, (result) => {
+              void chrome.runtime.lastError;
+              resolve(result || []);
+            })
+          );
+          if (cookies.length > 0) {
+            headers.cookie = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+          }
         }
       } catch (e) {
         console.log("[MDM] cookies.getAll error:", e.message);

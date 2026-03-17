@@ -111,9 +111,12 @@ browser.contextMenus.onClicked.addListener(async (info) => {
     const headers = { ...(cached?.headers || {}) };
     if (!headers.cookie) {
       try {
-        const cookies = await browser.cookies.getAll({ url });
-        if (cookies.length > 0) {
-          headers.cookie = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+        const granted = await browser.permissions.request({ permissions: ["cookies"] });
+        if (granted) {
+          const cookies = await browser.cookies.getAll({ url });
+          if (cookies.length > 0) {
+            headers.cookie = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+          }
         }
       } catch (e) {
         console.log("[MDM] cookies.getAll error:", e.message);
