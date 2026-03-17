@@ -3,16 +3,21 @@ import Foundation
 
 final class Aria2ProcessManager {
     private var process: Process?
+    private let pidFileURL: URL
+
+    init(pidFileURL: URL? = nil) {
+        if let pidFileURL {
+            self.pidFileURL = pidFileURL
+        } else {
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            self.pidFileURL = appSupport
+                .appendingPathComponent("Mac Download Manager", isDirectory: true)
+                .appendingPathComponent("aria2.pid")
+        }
+    }
 
     var isRunning: Bool {
         process?.isRunning ?? false
-    }
-
-    private var pidFileURL: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        return appSupport
-            .appendingPathComponent("Mac Download Manager", isDirectory: true)
-            .appendingPathComponent("aria2.pid")
     }
 
     func launch(
@@ -43,12 +48,16 @@ final class Aria2ProcessManager {
         ]
         process.standardOutput = nil
         process.standardError = nil
+        process.terminationHandler = { [weak self] _ in
+            self?.removePidFile()
+        }
 
         try process.run()
         do {
             try writePidFile(pid: process.processIdentifier)
         } catch {
             process.terminate()
+            process.waitUntilExit()
             throw error
         }
         self.process = process
@@ -109,14 +118,19 @@ final class Aria2ProcessManager {
         }
         let killResult = Darwin.kill(pid, SIGTERM)
         guard killResult == 0 || errno == ESRCH else { return }
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            if !Self.isAria2Process(pid: pid) { break }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
         removePidFile()
     }
 
     func terminate() {
         guard let process, process.isRunning else { return }
-        process.terminate()
         self.process = nil
-        removePidFile()
+        process.terminate()
+        // terminationHandler removes the PID file once the process has exited
     }
 
     private static func isAria2Process(pid: Int32) -> Bool {
