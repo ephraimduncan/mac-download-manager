@@ -7,11 +7,32 @@ let appBundleId = "com.macdownloadmanager.app"
 let logDir = NSHomeDirectory() + "/Library/Logs/Mac Download Manager"
 let logPath = logDir + "/helper.log"
 
+let logMaxBytes: UInt64 = 5 * 1024 * 1024  // 5 MB
+let logMaxBackups = 3
+
+func rotateLogs() {
+    let fm = FileManager.default
+    // Remove the oldest backup if it exists, then shift each backup up by one.
+    for i in stride(from: logMaxBackups - 1, through: 1, by: -1) {
+        let src = logPath + ".\(i)"
+        let dst = logPath + ".\(i + 1)"
+        if fm.fileExists(atPath: src) {
+            try? fm.removeItem(atPath: dst)
+            try? fm.moveItem(atPath: src, toPath: dst)
+        }
+    }
+    try? fm.moveItem(atPath: logPath, toPath: logPath + ".1")
+}
+
 func log(_ message: String) {
     let ts = ISO8601DateFormatter().string(from: Date())
     let line = "[\(ts)] \(message)\n"
     if !FileManager.default.fileExists(atPath: logDir) {
         try? FileManager.default.createDirectory(atPath: logDir, withIntermediateDirectories: true)
+    }
+    if let attrs = try? FileManager.default.attributesOfItem(atPath: logPath),
+       let size = attrs[.size] as? UInt64, size >= logMaxBytes {
+        rotateLogs()
     }
     if let fh = FileHandle(forWritingAtPath: logPath) {
         fh.seekToEndOfFile()
