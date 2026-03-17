@@ -145,11 +145,10 @@ final class Aria2ProcessManager {
 
     func terminate() {
         guard let process, process.isRunning else { return }
-        self.process = nil
-        let capturedProcess = process
-        DispatchQueue.global(qos: .userInitiated).async {
-            capturedProcess.terminate()
-            capturedProcess.waitUntilExit()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            process.terminate()
+            process.waitUntilExit()
+            self?.process = nil
         }
     }
 
