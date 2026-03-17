@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 final class Aria2ProcessManager {
@@ -5,6 +6,13 @@ final class Aria2ProcessManager {
 
     var isRunning: Bool {
         process?.isRunning ?? false
+    }
+
+    private var pidFileURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        return appSupport
+            .appendingPathComponent("Mac Download Manager", isDirectory: true)
+            .appendingPathComponent("aria2.pid")
     }
 
     func launch(
@@ -38,22 +46,38 @@ final class Aria2ProcessManager {
 
         try process.run()
         self.process = process
+        writePidFile(pid: process.processIdentifier)
+    }
+
+    private func writePidFile(pid: Int32) {
+        let url = pidFileURL
+        try? FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try? "\(pid)".write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private func removePidFile() {
+        try? FileManager.default.removeItem(at: pidFileURL)
     }
 
     private func killStaleProcesses() {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        task.arguments = ["-f", "aria2c.*--enable-rpc"]
-        task.standardOutput = nil
-        task.standardError = nil
-        try? task.run()
-        task.waitUntilExit()
+        let url = pidFileURL
+        guard
+            let contents = try? String(contentsOf: url, encoding: .utf8),
+            let pid = Int32(contents.trimmingCharacters(in: .whitespacesAndNewlines))
+        else { return }
+
+        Darwin.kill(pid, SIGTERM)
+        removePidFile()
     }
 
     func terminate() {
         guard let process, process.isRunning else { return }
         process.terminate()
         self.process = nil
+        removePidFile()
     }
 
     private static func findBinary() -> String? {
