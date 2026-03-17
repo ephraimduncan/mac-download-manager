@@ -45,8 +45,13 @@ final class Aria2ProcessManager {
         process.standardError = nil
 
         try process.run()
+        do {
+            try writePidFile(pid: process.processIdentifier)
+        } catch {
+            process.terminate()
+            throw error
+        }
         self.process = process
-        try writePidFile(pid: process.processIdentifier)
     }
 
     private func writePidFile(pid: Int32) throws {
@@ -63,11 +68,21 @@ final class Aria2ProcessManager {
             flock(fd, LOCK_UN)
             close(fd)
         }
-        flock(fd, LOCK_EX)
-        ftruncate(fd, 0)
-        let content = "\(pid)"
-        guard content.withCString({ write(fd, $0, strlen($0)) }) > 0 else {
+        guard flock(fd, LOCK_EX) == 0 else {
             throw Aria2Error.pidFileWriteFailed
+        }
+        guard ftruncate(fd, 0) == 0 else {
+            throw Aria2Error.pidFileWriteFailed
+        }
+        let content = "\(pid)"
+        try content.withCString { ptr in
+            let total = strlen(ptr)
+            var written = 0
+            while written < total {
+                let n = write(fd, ptr + written, total - written)
+                guard n > 0 else { throw Aria2Error.pidFileWriteFailed }
+                written += n
+            }
         }
     }
 
@@ -92,7 +107,8 @@ final class Aria2ProcessManager {
             removePidFile()
             return
         }
-        Darwin.kill(pid, SIGTERM)
+        let killResult = Darwin.kill(pid, SIGTERM)
+        guard killResult == 0 || errno == ESRCH else { return }
         removePidFile()
     }
 
