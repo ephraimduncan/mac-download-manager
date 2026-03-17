@@ -64,12 +64,13 @@ browser.webRequest.onSendHeaders.addListener(
   ["requestHeaders"]
 );
 
-browser.runtime.onInstalled.addListener(() => {
+browser.runtime.onInstalled.addListener(async () => {
+  await browser.contextMenus.removeAll();
   browser.contextMenus.create({
     id: "download-with-mdm",
     title: "Download with Mac Download Manager",
     contexts: ["link"],
-  });
+  }).catch((e) => console.log("[MDM] contextMenus.create error:", e.message));
 });
 
 browser.contextMenus.onClicked.addListener((info) => {
@@ -78,7 +79,15 @@ browser.contextMenus.onClicked.addListener((info) => {
   const url = info.linkUrl;
   if (!url) return;
 
-  const filename = url.split("/").pop() || "";
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return;
+  }
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") return;
+
+  const filename = decodeURIComponent(parsedUrl.pathname.split("/").pop() || "");
   const referrer = info.pageUrl || "";
   const cached = headerCache.get(url);
 

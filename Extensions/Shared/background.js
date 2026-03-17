@@ -65,10 +65,12 @@ chrome.webRequest.onSendHeaders.addListener(
 );
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: "download-with-mdm",
-    title: "Download with Mac Download Manager",
-    contexts: ["link"],
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "download-with-mdm",
+      title: "Download with Mac Download Manager",
+      contexts: ["link"],
+    }, () => { void chrome.runtime.lastError; });
   });
 });
 
@@ -78,7 +80,15 @@ chrome.contextMenus.onClicked.addListener((info) => {
   const url = info.linkUrl;
   if (!url) return;
 
-  const filename = url.split("/").pop() || "";
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return;
+  }
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") return;
+
+  const filename = decodeURIComponent(parsedUrl.pathname.split("/").pop() || "");
   const referrer = info.pageUrl || "";
   const cached = headerCache.get(url);
 
