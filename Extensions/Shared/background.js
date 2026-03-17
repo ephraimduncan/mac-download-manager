@@ -64,15 +64,21 @@ chrome.webRequest.onSendHeaders.addListener(
   ["requestHeaders"]
 );
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.removeAll(() => {
-    void chrome.runtime.lastError;
+chrome.runtime.onInstalled.addListener(async () => {
+  try {
+    await chrome.contextMenus.removeAll();
+  } catch (e) {
+    console.log("[MDM] contextMenus.removeAll error:", e.message);
+  }
+  try {
     chrome.contextMenus.create({
       id: "download-with-mdm",
       title: "Download with Mac Download Manager",
       contexts: ["link"],
     }, () => { void chrome.runtime.lastError; });
-  });
+  } catch (e) {
+    console.log("[MDM] contextMenus.create error:", e.message);
+  }
 });
 
 chrome.contextMenus.onClicked.addListener(async (info) => {
