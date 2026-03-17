@@ -64,6 +64,33 @@ browser.webRequest.onSendHeaders.addListener(
   ["requestHeaders"]
 );
 
+browser.runtime.onInstalled.addListener(() => {
+  browser.contextMenus.create({
+    id: "download-with-mdm",
+    title: "Download with Mac Download Manager",
+    contexts: ["link"],
+  });
+});
+
+browser.contextMenus.onClicked.addListener((info) => {
+  if (info.menuItemId !== "download-with-mdm") return;
+
+  const url = info.linkUrl;
+  if (!url) return;
+
+  const filename = url.split("/").pop() || "";
+  const referrer = info.pageUrl || "";
+  const cached = headerCache.get(url);
+
+  sendNativeMessage({
+    url,
+    headers: cached?.headers || null,
+    filename,
+    fileSize: null,
+    referrer,
+  });
+});
+
 function getExtension(filename) {
   if (!filename) return "";
   if (filename.endsWith(".tar.gz")) return "tar.gz";
