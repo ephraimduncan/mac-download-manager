@@ -66,6 +66,7 @@ chrome.webRequest.onSendHeaders.addListener(
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
+    void chrome.runtime.lastError;
     chrome.contextMenus.create({
       id: "download-with-mdm",
       title: "Download with Mac Download Manager",
@@ -75,30 +76,40 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.contextMenus.onClicked.addListener((info) => {
-  if (info.menuItemId !== "download-with-mdm") return;
-
-  const url = info.linkUrl;
-  if (!url) return;
-
-  let parsedUrl;
   try {
-    parsedUrl = new URL(url);
-  } catch {
-    return;
+    if (info.menuItemId !== "download-with-mdm") return;
+
+    const url = info.linkUrl;
+    if (!url) return;
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return;
+    }
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") return;
+
+    const rawSegment = parsedUrl.pathname.split("/").pop() || "";
+    let filename;
+    try {
+      filename = decodeURIComponent(rawSegment);
+    } catch {
+      filename = rawSegment;
+    }
+    const referrer = info.pageUrl || "";
+    const cached = headerCache.get(url);
+
+    sendNativeMessage({
+      url,
+      headers: cached?.headers || null,
+      filename,
+      fileSize: null,
+      referrer,
+    });
+  } catch (e) {
+    console.log("[MDM] contextMenus.onClicked error:", e.message);
   }
-  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") return;
-
-  const filename = decodeURIComponent(parsedUrl.pathname.split("/").pop() || "");
-  const referrer = info.pageUrl || "";
-  const cached = headerCache.get(url);
-
-  sendNativeMessage({
-    url,
-    headers: cached?.headers || null,
-    filename,
-    fileSize: null,
-    referrer,
-  });
 });
 
 function getExtension(filename) {
