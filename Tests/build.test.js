@@ -47,6 +47,7 @@ describe("manifest validity and version", () => {
       assert.equal(manifest.manifest_version, 3);
       assert.equal(manifest.version, pkg.version);
       assert.ok(manifest.permissions.includes("nativeMessaging"));
+      assert.ok(manifest.permissions.includes("contextMenus"));
     });
   }
 });

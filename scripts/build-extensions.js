@@ -47,7 +47,7 @@ function baseManifest() {
     version: VERSION,
     description:
       "Intercept downloads and send them to Mac Download Manager for accelerated downloading",
-    permissions: ["downloads", "webRequest", "nativeMessaging", "storage", "contextMenus"],
+    permissions: ["downloads", "webRequest", "nativeMessaging", "storage", "contextMenus", "cookies"],
     host_permissions: ["<all_urls>"],
     action: {
       default_popup: "popup.html",
