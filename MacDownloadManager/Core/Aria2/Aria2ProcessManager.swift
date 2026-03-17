@@ -46,16 +46,29 @@ final class Aria2ProcessManager {
 
         try process.run()
         self.process = process
-        writePidFile(pid: process.processIdentifier)
+        try writePidFile(pid: process.processIdentifier)
     }
 
-    private func writePidFile(pid: Int32) {
+    private func writePidFile(pid: Int32) throws {
         let url = pidFileURL
-        try? FileManager.default.createDirectory(
+        try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        try? "\(pid)".write(to: url, atomically: true, encoding: .utf8)
+        let fd = open(url.path, O_RDWR | O_CREAT, 0o644)
+        guard fd >= 0 else {
+            throw Aria2Error.pidFileWriteFailed
+        }
+        defer {
+            flock(fd, LOCK_UN)
+            close(fd)
+        }
+        flock(fd, LOCK_EX)
+        ftruncate(fd, 0)
+        let content = "\(pid)"
+        guard content.withCString({ write(fd, $0, strlen($0)) }) > 0 else {
+            throw Aria2Error.pidFileWriteFailed
+        }
     }
 
     private func removePidFile() {
@@ -63,12 +76,22 @@ final class Aria2ProcessManager {
     }
 
     private func killStaleProcesses() {
-        let url = pidFileURL
-        guard
-            let contents = try? String(contentsOf: url, encoding: .utf8),
-            let pid = Int32(contents.trimmingCharacters(in: .whitespacesAndNewlines))
-        else { return }
-
+        let path = pidFileURL.path
+        let fd = open(path, O_RDONLY)
+        guard fd >= 0 else { return }
+        defer {
+            flock(fd, LOCK_UN)
+            close(fd)
+        }
+        flock(fd, LOCK_SH)
+        var buffer = [CChar](repeating: 0, count: 32)
+        guard read(fd, &buffer, buffer.count - 1) > 0 else { return }
+        let contents = String(cString: buffer)
+        guard let pid = Int32(contents.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
+        guard Self.isAria2Process(pid: pid) else {
+            removePidFile()
+            return
+        }
         Darwin.kill(pid, SIGTERM)
         removePidFile()
     }
@@ -78,6 +101,13 @@ final class Aria2ProcessManager {
         process.terminate()
         self.process = nil
         removePidFile()
+    }
+
+    private static func isAria2Process(pid: Int32) -> Bool {
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard proc_pidpath(pid, &buffer, UInt32(MAXPATHLEN)) > 0 else { return false }
+        let path = String(cString: buffer)
+        return path.hasSuffix("/aria2c") || path == "aria2c"
     }
 
     private static func findBinary() -> String? {
