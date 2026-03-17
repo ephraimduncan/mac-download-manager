@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 enum Aria2Error: Error, Sendable {
