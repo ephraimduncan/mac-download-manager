@@ -7,7 +7,7 @@ enum Aria2Error: Error, Sendable {
     case rpcError(code: Int, message: String)
     case requestFailed(statusCode: Int)
     case encodingFailed
-    case pidFileWriteFailed
+    case pidFileWriteFailed(path: String, errno: Int32)
 }
 
 extension Aria2Error: LocalizedError {
@@ -19,7 +19,8 @@ extension Aria2Error: LocalizedError {
         case .rpcError(_, let msg): msg
         case .requestFailed(let s): "HTTP \(s) from aria2c"
         case .encodingFailed: "Failed to encode request"
-        case .pidFileWriteFailed: "Failed to write aria2c PID file"
+        case .pidFileWriteFailed(let path, let errno):
+            "Failed to write aria2c PID file at \(path): \(String(cString: strerror(errno))) (errno \(errno))"
         }
     }
 }

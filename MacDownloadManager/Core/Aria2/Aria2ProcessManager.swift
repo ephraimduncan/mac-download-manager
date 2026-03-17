@@ -71,17 +71,17 @@ final class Aria2ProcessManager {
         )
         let fd = open(url.path, O_RDWR | O_CREAT, 0o644)
         guard fd >= 0 else {
-            throw Aria2Error.pidFileWriteFailed
+            throw Aria2Error.pidFileWriteFailed(path: url.path, errno: Darwin.errno)
         }
         defer {
             flock(fd, LOCK_UN)
             close(fd)
         }
         guard flock(fd, LOCK_EX) == 0 else {
-            throw Aria2Error.pidFileWriteFailed
+            throw Aria2Error.pidFileWriteFailed(path: url.path, errno: Darwin.errno)
         }
         guard ftruncate(fd, 0) == 0 else {
-            throw Aria2Error.pidFileWriteFailed
+            throw Aria2Error.pidFileWriteFailed(path: url.path, errno: Darwin.errno)
         }
         let content = "\(pid)"
         try content.withCString { ptr in
@@ -89,7 +89,7 @@ final class Aria2ProcessManager {
             var written = 0
             while written < total {
                 let n = write(fd, ptr + written, total - written)
-                guard n > 0 else { throw Aria2Error.pidFileWriteFailed }
+                guard n > 0 else { throw Aria2Error.pidFileWriteFailed(path: url.path, errno: Darwin.errno) }
                 written += n
             }
         }
@@ -107,7 +107,7 @@ final class Aria2ProcessManager {
             flock(fd, LOCK_UN)
             close(fd)
         }
-        flock(fd, LOCK_SH)
+        guard flock(fd, LOCK_SH) == 0 else { return }
         var buffer = [CChar](repeating: 0, count: 32)
         guard read(fd, &buffer, buffer.count - 1) > 0 else { return }
         let contents = String(cString: buffer)
@@ -123,14 +123,23 @@ final class Aria2ProcessManager {
             if !Self.isAria2Process(pid: pid) { break }
             Thread.sleep(forTimeInterval: 0.05)
         }
+        if Self.isAria2Process(pid: pid) {
+            Darwin.kill(pid, SIGKILL)
+            let killDeadline = Date().addingTimeInterval(1)
+            while Date() < killDeadline {
+                if !Self.isAria2Process(pid: pid) { break }
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+            if Self.isAria2Process(pid: pid) { return }
+        }
         removePidFile()
     }
 
     func terminate() {
         guard let process, process.isRunning else { return }
-        self.process = nil
         process.terminate()
-        // terminationHandler removes the PID file once the process has exited
+        process.waitUntilExit()
+        self.process = nil
     }
 
     private static func isAria2Process(pid: Int32) -> Bool {
