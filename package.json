@@ -12,6 +12,6 @@
     "clean": "rm -rf dist"
   },
   "devDependencies": {
-    "web-ext": "^9.4.0"
+    "web-ext": "^9.2.0"
   }
 }
