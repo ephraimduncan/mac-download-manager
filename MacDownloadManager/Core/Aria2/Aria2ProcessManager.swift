@@ -164,7 +164,9 @@ actor Aria2ProcessManager {
             return
         }
         let killResult = Darwin.kill(pid, SIGTERM)
-        guard killResult == 0 || errno == ESRCH else { return }
+        guard killResult == 0 || errno == ESRCH else {
+            throw Aria2Error.staleProcessCleanupFailed(pid: pid)
+        }
         let deadline = Date().addingTimeInterval(3)
         while Date() < deadline {
             if !isAria2Process(pid: pid) { break }
