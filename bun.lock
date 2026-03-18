@@ -5,7 +5,7 @@
     "": {
       "name": "mac-download-manager-extensions",
       "devDependencies": {
-        "web-ext": "^9.2.0",
+        "web-ext": "^9.4.0",
       },
     },
   },
