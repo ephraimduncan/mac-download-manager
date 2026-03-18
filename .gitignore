@@ -17,3 +17,4 @@ node_modules/
 build/
 dmg-staging/
 *.bak
+package-lock.json

@@ -83,17 +83,13 @@ actor Aria2ProcessManager {
         }.value
     }
 
-    func terminate() {
+    func terminate() async {
         guard let process, process.isRunning else { return }
         let wrapper = SendableProcess(process)
-        Task.detached(priority: .userInitiated) { [weak self] in
+        await Task.detached(priority: .userInitiated) {
             wrapper.process.terminate()
             wrapper.process.waitUntilExit()
-            await self?.didExit(wrapper)
-        }
-    }
-
-    private func didExit(_ wrapper: SendableProcess) {
+        }.value
         if self.process === wrapper.process {
             self.process = nil
         }
