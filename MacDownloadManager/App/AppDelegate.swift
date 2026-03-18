@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         pollingTask?.cancel()
         safariDownloadMonitor?.stop()
-        container.processManager.terminate()
+        Task { await container.processManager.terminate() }
         container.socketServer.stop()
         endDownloadActivity()
     }

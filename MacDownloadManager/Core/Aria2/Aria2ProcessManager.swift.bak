@@ -1,18 +1,15 @@
 import Darwin
 import Foundation
 
-actor Aria2ProcessManager {
+final class Aria2ProcessManager {
     private var process: Process?
     private let pidFileURL: URL
 
-    init(pidFileURL: URL? = nil) throws {
+    init(pidFileURL: URL? = nil) {
         if let pidFileURL {
             self.pidFileURL = pidFileURL
         } else {
-            let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            guard let appSupport = urls.first else {
-                throw Aria2Error.pidFileURLUnavailable
-            }
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             self.pidFileURL = appSupport
                 .appendingPathComponent("Mac Download Manager", isDirectory: true)
                 .appendingPathComponent("aria2.pid")
@@ -29,7 +26,12 @@ actor Aria2ProcessManager {
         downloadDir: String,
         maxConcurrent: Int
     ) async throws {
-        await killStaleProcesses()
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                self.killStaleProcesses()
+                continuation.resume()
+            }
+        }
 
         let binaryPath = Self.findBinary()
         guard let binaryPath else {
@@ -56,52 +58,21 @@ actor Aria2ProcessManager {
         }
 
         try process.run()
-        let pid = process.processIdentifier
-        let pidURL = pidFileURL
         do {
-            try await Task.detached(priority: .userInitiated) {
-                try Self.writePidFile(at: pidURL, pid: pid)
-            }.value
+            try writePidFile(pid: process.processIdentifier)
         } catch {
-            let wrapper = SendableProcess(process)
-            Task.detached(priority: .utility) {
-                wrapper.process.terminate()
-                wrapper.process.waitUntilExit()
+            let capturedProcess = process
+            DispatchQueue.global(qos: .utility).async {
+                capturedProcess.terminate()
+                capturedProcess.waitUntilExit()
             }
             throw error
         }
         self.process = process
     }
 
-    // nonisolated so it can be called synchronously from the terminationHandler closure.
-    nonisolated private func removePidFile() {
-        try? FileManager.default.removeItem(at: pidFileURL)
-    }
-
-    private func killStaleProcesses() async {
-        let pidURL = pidFileURL
-        await Task.detached(priority: .userInitiated) {
-            Self.killStaleProcessesSync(pidFileURL: pidURL)
-        }.value
-    }
-
-    func terminate() {
-        guard let process, process.isRunning else { return }
-        let wrapper = SendableProcess(process)
-        Task.detached(priority: .userInitiated) { [weak self] in
-            wrapper.process.terminate()
-            wrapper.process.waitUntilExit()
-            await self?.didExit(wrapper)
-        }
-    }
-
-    private func didExit(_ wrapper: SendableProcess) {
-        if self.process === wrapper.process {
-            self.process = nil
-        }
-    }
-
-    private static func writePidFile(at url: URL, pid: Int32) throws {
+    private func writePidFile(pid: Int32) throws {
+        let url = pidFileURL
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -114,17 +85,7 @@ actor Aria2ProcessManager {
             flock(fd, LOCK_UN)
             close(fd)
         }
-        let lockDeadline = Date().addingTimeInterval(1)
-        var locked = false
-        while Date() < lockDeadline {
-            if flock(fd, LOCK_EX | LOCK_NB) == 0 {
-                locked = true
-                break
-            }
-            guard errno == EWOULDBLOCK else { break }
-            Thread.sleep(forTimeInterval: 0.05)
-        }
-        guard locked else {
+        guard flock(fd, LOCK_EX) == 0 else {
             throw Aria2Error.pidFileWriteFailed(path: url.path, errno: Darwin.errno)
         }
         guard ftruncate(fd, 0) == 0 else {
@@ -142,7 +103,11 @@ actor Aria2ProcessManager {
         }
     }
 
-    private static func killStaleProcessesSync(pidFileURL: URL) {
+    private func removePidFile() {
+        try? FileManager.default.removeItem(at: pidFileURL)
+    }
+
+    private func killStaleProcesses() {
         let path = pidFileURL.path
         let fd = open(path, O_RDONLY)
         guard fd >= 0 else { return }
@@ -150,42 +115,41 @@ actor Aria2ProcessManager {
             flock(fd, LOCK_UN)
             close(fd)
         }
-        let lockDeadline = Date().addingTimeInterval(1)
-        var locked = false
-        while Date() < lockDeadline {
-            if flock(fd, LOCK_SH | LOCK_NB) == 0 {
-                locked = true
-                break
-            }
-            guard errno == EWOULDBLOCK else { break }
-            Thread.sleep(forTimeInterval: 0.05)
-        }
-        guard locked else { return }
+        guard flock(fd, LOCK_SH) == 0 else { return }
         var buffer = [CChar](repeating: 0, count: 32)
         guard read(fd, &buffer, buffer.count - 1) > 0 else { return }
         let contents = String(cString: buffer)
         guard let pid = Int32(contents.trimmingCharacters(in: .whitespacesAndNewlines)) else { return }
-        guard isAria2Process(pid: pid) else {
-            try? FileManager.default.removeItem(at: pidFileURL)
+        guard Self.isAria2Process(pid: pid) else {
+            removePidFile()
             return
         }
         let killResult = Darwin.kill(pid, SIGTERM)
         guard killResult == 0 || errno == ESRCH else { return }
         let deadline = Date().addingTimeInterval(3)
         while Date() < deadline {
-            if !isAria2Process(pid: pid) { break }
+            if !Self.isAria2Process(pid: pid) { break }
             Thread.sleep(forTimeInterval: 0.05)
         }
-        if isAria2Process(pid: pid) {
+        if Self.isAria2Process(pid: pid) {
             Darwin.kill(pid, SIGKILL)
             let killDeadline = Date().addingTimeInterval(1)
             while Date() < killDeadline {
-                if !isAria2Process(pid: pid) { break }
+                if !Self.isAria2Process(pid: pid) { break }
                 Thread.sleep(forTimeInterval: 0.05)
             }
-            guard !isAria2Process(pid: pid) else { return }
+            guard !Self.isAria2Process(pid: pid) else { return }
         }
-        try? FileManager.default.removeItem(at: pidFileURL)
+        removePidFile()
+    }
+
+    func terminate() {
+        guard let process, process.isRunning else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            process.terminate()
+            process.waitUntilExit()
+            self?.process = nil
+        }
     }
 
     private static func isAria2Process(pid: Int32) -> Bool {
@@ -210,10 +174,4 @@ actor Aria2ProcessManager {
 
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
-}
-
-// Process is not Sendable, so wrap it to safely cross concurrency boundaries.
-private final class SendableProcess: @unchecked Sendable {
-    let process: Process
-    init(_ process: Process) { self.process = process }
 }

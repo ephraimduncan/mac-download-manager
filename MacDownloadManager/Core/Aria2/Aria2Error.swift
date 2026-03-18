@@ -9,6 +9,7 @@ enum Aria2Error: Error, Sendable {
     case requestFailed(statusCode: Int)
     case encodingFailed
     case pidFileWriteFailed(path: String, errno: Int32)
+    case pidFileURLUnavailable
 }
 
 extension Aria2Error: LocalizedError {
@@ -22,6 +23,7 @@ extension Aria2Error: LocalizedError {
         case .encodingFailed: "Failed to encode request"
         case .pidFileWriteFailed(let path, let errno):
             "Failed to write aria2c PID file at \(path): \(String(cString: strerror(errno))) (errno \(errno))"
+        case .pidFileURLUnavailable: "Failed to resolve application support directory for aria2c PID file"
         }
     }
 }
