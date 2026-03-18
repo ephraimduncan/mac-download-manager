@@ -5,14 +5,12 @@ actor Aria2ProcessManager {
     private var process: Process?
     private let pidFileURL: URL
 
-    init(pidFileURL: URL? = nil) throws {
+    init(pidFileURL: URL? = nil) {
         if let pidFileURL {
             self.pidFileURL = pidFileURL
         } else {
-            let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
-            guard let appSupport = urls.first else {
-                throw Aria2Error.pidFileURLUnavailable
-            }
+            let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? FileManager.default.temporaryDirectory
             self.pidFileURL = appSupport
                 .appendingPathComponent("Mac Download Manager", isDirectory: true)
                 .appendingPathComponent("aria2.pid")
@@ -29,7 +27,7 @@ actor Aria2ProcessManager {
         downloadDir: String,
         maxConcurrent: Int
     ) async throws {
-        await killStaleProcesses()
+        try await killStaleProcesses()
 
         let binaryPath = Self.findBinary()
         guard let binaryPath else {
@@ -78,10 +76,10 @@ actor Aria2ProcessManager {
         try? FileManager.default.removeItem(at: pidFileURL)
     }
 
-    private func killStaleProcesses() async {
+    private func killStaleProcesses() async throws {
         let pidURL = pidFileURL
-        await Task.detached(priority: .userInitiated) {
-            Self.killStaleProcessesSync(pidFileURL: pidURL)
+        try await Task.detached(priority: .userInitiated) {
+            try Self.killStaleProcessesSync(pidFileURL: pidURL)
         }.value
     }
 
@@ -142,7 +140,7 @@ actor Aria2ProcessManager {
         }
     }
 
-    private static func killStaleProcessesSync(pidFileURL: URL) {
+    private static func killStaleProcessesSync(pidFileURL: URL) throws {
         let path = pidFileURL.path
         let fd = open(path, O_RDONLY)
         guard fd >= 0 else { return }
@@ -183,7 +181,9 @@ actor Aria2ProcessManager {
                 if !isAria2Process(pid: pid) { break }
                 Thread.sleep(forTimeInterval: 0.05)
             }
-            guard !isAria2Process(pid: pid) else { return }
+            guard !isAria2Process(pid: pid) else {
+                throw Aria2Error.staleProcessCleanupFailed(pid: pid)
+            }
         }
         try? FileManager.default.removeItem(at: pidFileURL)
     }

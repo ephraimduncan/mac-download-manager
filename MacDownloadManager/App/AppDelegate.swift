@@ -21,19 +21,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard container.activeDownloadCount > 0 else { return .terminateNow }
+        if container.activeDownloadCount > 0 {
+            let alert = NSAlert()
+            alert.messageText = "Downloads are active"
+            alert.informativeText = "Quitting will pause all active downloads. Quit anyway?"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Quit")
+            alert.addButton(withTitle: "Cancel")
 
-        let alert = NSAlert()
-        alert.messageText = "Downloads are active"
-        alert.informativeText = "Quitting will pause all active downloads. Quit anyway?"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Quit")
-        alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
 
-        guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+            Task {
+                try? await container.aria2Client.pauseAll()
+                await container.processManager.terminate()
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        }
 
         Task {
-            try? await container.aria2Client.pauseAll()
+            await container.processManager.terminate()
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
@@ -42,7 +49,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         pollingTask?.cancel()
         safariDownloadMonitor?.stop()
-        Task { await container.processManager.terminate() }
         container.socketServer.stop()
         endDownloadActivity()
     }

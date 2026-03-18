@@ -51,7 +51,7 @@ final class DependencyContainer {
         repository = GRDBDownloadRepository(dbQueue: databaseManager.dbQueue)
 
         aria2Client = Aria2Client(port: 6800, secret: aria2Secret)
-        processManager = try! Aria2ProcessManager()
+        processManager = Aria2ProcessManager()
         socketServer = SocketServer()
         settingsViewModel = SettingsViewModel(aria2: aria2Client)
         notificationService = NotificationService.shared
@@ -63,7 +63,7 @@ final class DependencyContainer {
         databaseManager = try! DatabaseManager(inMemory: true)
         repository = InMemoryDownloadRepository()
         aria2Client = Aria2Client(port: 6800, secret: "test")
-        processManager = try! Aria2ProcessManager()
+        processManager = Aria2ProcessManager()
         socketServer = SocketServer()
         settingsViewModel = SettingsViewModel(aria2: aria2Client)
         notificationService = NotificationService.shared
