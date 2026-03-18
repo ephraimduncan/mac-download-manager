@@ -64,6 +64,77 @@ browser.webRequest.onSendHeaders.addListener(
   ["requestHeaders"]
 );
 
+browser.runtime.onInstalled.addListener(async () => {
+  try {
+    await browser.contextMenus.removeAll();
+  } catch (e) {
+    console.log("[MDM] contextMenus.removeAll error:", e.message);
+  }
+  try {
+    browser.contextMenus.create({
+      id: "download-with-mdm",
+      title: "Download with Mac Download Manager",
+      contexts: ["link"],
+    });
+  } catch (e) {
+    console.log("[MDM] contextMenus.create error:", e.message);
+  }
+});
+
+browser.contextMenus.onClicked.addListener(async (info) => {
+  try {
+    if (info.menuItemId !== "download-with-mdm") return;
+
+    const url = info.linkUrl;
+    if (!url) return;
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return;
+    }
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") return;
+
+    const rawSegment = parsedUrl.pathname.split("/").pop() || "";
+    let filename;
+    try {
+      filename = decodeURIComponent(rawSegment);
+    } catch {
+      filename = rawSegment;
+    }
+    const referrer = info.pageUrl || "";
+
+    // headerCache is empty for context menu items (no prior request was made),
+    // so explicitly fetch cookies for the link URL to support authenticated downloads.
+    const cached = headerCache.get(url);
+    const headers = { ...(cached?.headers || {}) };
+    if (!headers.cookie) {
+      try {
+        const granted = await browser.permissions.request({ permissions: ["cookies"] });
+        if (granted) {
+          const cookies = await browser.cookies.getAll({ url });
+          if (cookies.length > 0) {
+            headers.cookie = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+          }
+        }
+      } catch (e) {
+        console.log("[MDM] cookies.getAll error:", e.message);
+      }
+    }
+
+    sendNativeMessage({
+      url,
+      headers: Object.keys(headers).length > 0 ? headers : null,
+      filename,
+      fileSize: null,
+      referrer,
+    });
+  } catch (e) {
+    console.log("[MDM] contextMenus.onClicked error:", e.message);
+  }
+});
+
 function getExtension(filename) {
   if (!filename) return "";
   if (filename.endsWith(".tar.gz")) return "tar.gz";

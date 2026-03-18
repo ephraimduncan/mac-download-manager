@@ -64,6 +64,98 @@ chrome.webRequest.onSendHeaders.addListener(
   ["requestHeaders"]
 );
 
+chrome.runtime.onInstalled.addListener(async () => {
+  try {
+    await new Promise((resolve, reject) =>
+      chrome.contextMenus.removeAll(() => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve();
+        }
+      })
+    );
+  } catch (e) {
+    console.log("[MDM] contextMenus.removeAll error:", e.message);
+  }
+  try {
+    chrome.contextMenus.create({
+      id: "download-with-mdm",
+      title: "Download with Mac Download Manager",
+      contexts: ["link"],
+    }, () => { void chrome.runtime.lastError; });
+  } catch (e) {
+    console.log("[MDM] contextMenus.create error:", e.message);
+  }
+});
+
+chrome.contextMenus.onClicked.addListener(async (info) => {
+  try {
+    if (info.menuItemId !== "download-with-mdm") return;
+
+    const url = info.linkUrl;
+    if (!url) return;
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return;
+    }
+    if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") return;
+
+    const rawSegment = parsedUrl.pathname.split("/").pop() || "";
+    let filename;
+    try {
+      filename = decodeURIComponent(rawSegment);
+    } catch {
+      filename = rawSegment;
+    }
+    const referrer = info.pageUrl || "";
+
+    // headerCache is empty for context menu items (no prior request was made),
+    // so explicitly fetch cookies for the link URL to support authenticated downloads.
+    const cached = headerCache.get(url);
+    const headers = { ...(cached?.headers || {}) };
+    if (!headers.cookie) {
+      try {
+        const granted = await new Promise((resolve, reject) =>
+          chrome.permissions.request({ permissions: ["cookies"] }, (result) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(result);
+            }
+          })
+        );
+        if (granted) {
+          const cookies = await new Promise((resolve) =>
+            chrome.cookies.getAll({ url }, (result) => {
+              void chrome.runtime.lastError;
+              resolve(result || []);
+            })
+          );
+          if (cookies.length > 0) {
+            headers.cookie = cookies.map(c => `${c.name}=${c.value}`).join("; ");
+          }
+        }
+      } catch (e) {
+        console.log("[MDM] cookies.getAll error:", e.message);
+      }
+    }
+
+    sendNativeMessage({
+      url,
+      headers: Object.keys(headers).length > 0 ? headers : null,
+      filename,
+      fileSize: null,
+      referrer,
+    });
+  } catch (e) {
+    console.log("[MDM] contextMenus.onClicked error:", e.message);
+  }
+});
+
 function getExtension(filename) {
   if (!filename) return "";
   if (filename.endsWith(".tar.gz")) return "tar.gz";
