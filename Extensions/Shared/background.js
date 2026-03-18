@@ -66,7 +66,15 @@ chrome.webRequest.onSendHeaders.addListener(
 
 chrome.runtime.onInstalled.addListener(async () => {
   try {
-    await chrome.contextMenus.removeAll();
+    await new Promise((resolve, reject) =>
+      chrome.contextMenus.removeAll(() => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else {
+          resolve();
+        }
+      })
+    );
   } catch (e) {
     console.log("[MDM] contextMenus.removeAll error:", e.message);
   }
@@ -111,8 +119,14 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
     const headers = { ...(cached?.headers || {}) };
     if (!headers.cookie) {
       try {
-        const granted = await new Promise((resolve) =>
-          chrome.permissions.request({ permissions: ["cookies"] }, resolve)
+        const granted = await new Promise((resolve, reject) =>
+          chrome.permissions.request({ permissions: ["cookies"] }, (result) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(result);
+            }
+          })
         );
         if (granted) {
           const cookies = await new Promise((resolve) =>

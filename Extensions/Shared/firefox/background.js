@@ -67,17 +67,17 @@ browser.webRequest.onSendHeaders.addListener(
 browser.runtime.onInstalled.addListener(async () => {
   try {
     await browser.contextMenus.removeAll();
-    try {
-      browser.contextMenus.create({
-        id: "download-with-mdm",
-        title: "Download with Mac Download Manager",
-        contexts: ["link"],
-      });
-    } catch (e) {
-      console.log("[MDM] contextMenus.create error:", e.message);
-    }
   } catch (e) {
     console.log("[MDM] contextMenus.removeAll error:", e.message);
+  }
+  try {
+    browser.contextMenus.create({
+      id: "download-with-mdm",
+      title: "Download with Mac Download Manager",
+      contexts: ["link"],
+    });
+  } catch (e) {
+    console.log("[MDM] contextMenus.create error:", e.message);
   }
 });
 
