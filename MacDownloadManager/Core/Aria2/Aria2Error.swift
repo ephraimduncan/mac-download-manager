@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 enum Aria2Error: Error, Sendable {
@@ -7,6 +8,8 @@ enum Aria2Error: Error, Sendable {
     case rpcError(code: Int, message: String)
     case requestFailed(statusCode: Int)
     case encodingFailed
+    case pidFileWriteFailed(path: String, errno: Int32)
+    case staleProcessCleanupFailed(pid: Int32)
 }
 
 extension Aria2Error: LocalizedError {
@@ -18,6 +21,10 @@ extension Aria2Error: LocalizedError {
         case .rpcError(_, let msg): msg
         case .requestFailed(let s): "HTTP \(s) from aria2c"
         case .encodingFailed: "Failed to encode request"
+        case .pidFileWriteFailed(let path, let errno):
+            "Failed to write aria2c PID file at \(path): \(String(cString: strerror(errno))) (errno \(errno))"
+        case .staleProcessCleanupFailed(let pid):
+            "Failed to clean up stale aria2c process (PID \(pid)); aborting launch to avoid port conflicts"
         }
     }
 }

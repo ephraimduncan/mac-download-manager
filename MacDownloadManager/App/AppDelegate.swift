@@ -21,19 +21,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard container.activeDownloadCount > 0 else { return .terminateNow }
+        if container.activeDownloadCount > 0 {
+            let alert = NSAlert()
+            alert.messageText = "Downloads are active"
+            alert.informativeText = "Quitting will pause all active downloads. Quit anyway?"
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Quit")
+            alert.addButton(withTitle: "Cancel")
 
-        let alert = NSAlert()
-        alert.messageText = "Downloads are active"
-        alert.informativeText = "Quitting will pause all active downloads. Quit anyway?"
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: "Quit")
-        alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
 
-        guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+            Task {
+                try? await container.aria2Client.pauseAll()
+                await container.processManager.terminate()
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        }
 
         Task {
-            try? await container.aria2Client.pauseAll()
+            await container.processManager.terminate()
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
@@ -42,22 +49,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         pollingTask?.cancel()
         safariDownloadMonitor?.stop()
-        container.processManager.terminate()
         container.socketServer.stop()
         endDownloadActivity()
     }
 
     private func startAria2() {
-        let downloadDir = URL.downloadsDirectory.path(percentEncoded: false)
-        do {
-            try container.processManager.launch(
-                secret: container.aria2Secret,
-                port: container.aria2Port,
-                downloadDir: downloadDir,
-                maxConcurrent: 5
-            )
-        } catch {
-            print("Failed to launch aria2c: \(error)")
+        Task {
+            let downloadDir = URL.downloadsDirectory.path(percentEncoded: false)
+            do {
+                try await container.processManager.launch(
+                    secret: container.aria2Secret,
+                    port: container.aria2Port,
+                    downloadDir: downloadDir,
+                    maxConcurrent: 5
+                )
+            } catch {
+                print("Failed to launch aria2c: \(error)")
+            }
         }
     }
 
