@@ -193,6 +193,17 @@ struct DownloadListView: View {
                 }
                 .width(min: 70, ideal: 90)
 
+                TableColumn("ETA") { item in
+                    if item.status == .downloading, let formatted = item.formattedETA {
+                        Text(formatted)
+                            .monospacedDigit()
+                    } else {
+                        Text("—")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .width(min: 60, ideal: 80)
+
                 TableColumn("Date Added", value: \.createdAt) { item in
                     Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
                 }

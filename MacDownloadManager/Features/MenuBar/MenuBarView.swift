@@ -89,7 +89,11 @@ struct MenuBarView: View {
                     if isPaused {
                         Text("Paused — \(percent)%")
                     } else if download.speed > 0 {
-                        Text("\(formattedSpeed(download.speed)) — \(percent)%")
+                        if let eta = download.formattedETA {
+                            Text("\(formattedSpeed(download.speed)) — \(percent)% — \(eta) left")
+                        } else {
+                            Text("\(formattedSpeed(download.speed)) — \(percent)%")
+                        }
                     } else {
                         Text("\(percent)%")
                     }

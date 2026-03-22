@@ -21,6 +21,26 @@ struct DownloadItem: Identifiable, Sendable, Equatable {
         return TimeInterval(fileSize - downloadedSize) / TimeInterval(speed)
     }
 
+    var formattedETA: String? {
+        guard let eta else { return nil }
+        return Self.formatETA(eta)
+    }
+
+    static func formatETA(_ seconds: TimeInterval) -> String {
+        let total = Int(seconds)
+        if total < 60 {
+            return "\(total)s"
+        } else if total < 3600 {
+            let m = total / 60
+            let s = total % 60
+            return s > 0 ? "\(m)m \(s)s" : "\(m)m"
+        } else {
+            let h = total / 3600
+            let m = (total % 3600) / 60
+            return m > 0 ? "\(h)h \(m)m" : "\(h)h"
+        }
+    }
+
     var isActive: Bool {
         status == .downloading || status == .waiting
     }

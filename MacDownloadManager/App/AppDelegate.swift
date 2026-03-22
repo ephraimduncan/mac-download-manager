@@ -149,7 +149,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     progress: status.progress,
                     speed: status.speedBytesPerSec,
                     gid: status.gid,
-                    status: status.status
+                    status: status.status,
+                    totalLength: status.totalBytes,
+                    completedLength: status.completedBytes
                 )
             }
 

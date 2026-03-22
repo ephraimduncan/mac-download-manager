@@ -7,6 +7,18 @@ struct MenuBarDownload: Identifiable, Sendable {
     var speed: Int64
     var gid: String
     var status: String
+    var totalLength: Int64
+    var completedLength: Int64
+
+    var eta: TimeInterval? {
+        guard speed > 0, totalLength > completedLength else { return nil }
+        return TimeInterval(totalLength - completedLength) / TimeInterval(speed)
+    }
+
+    var formattedETA: String? {
+        guard let eta else { return nil }
+        return DownloadItem.formatETA(eta)
+    }
 }
 
 struct PendingExtensionDownload: Equatable {
