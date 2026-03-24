@@ -49,7 +49,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Mac Download Manager
         INFOPLIST_KEY_LSUIElement: false
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        GENERATE_INFOPLIST_FILE: true
+        GENERATE_INFOPLIST_FILE: false
         CODE_SIGN_IDENTITY: "-"
     info:
       path: MacDownloadManager/Info.plist
