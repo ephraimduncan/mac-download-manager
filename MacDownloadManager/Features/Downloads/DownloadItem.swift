@@ -1,5 +1,16 @@
 import Foundation
 
+struct TorrentFileItem: Identifiable, Sendable, Equatable {
+    let id: String
+    let filename: String
+    let fileSize: Int64
+    let downloadedSize: Int64
+
+    var progress: Double {
+        fileSize > 0 ? Double(downloadedSize) / Double(fileSize) : 0
+    }
+}
+
 struct DownloadItem: Identifiable, Sendable, Equatable {
     let id: UUID
     var url: URL
@@ -15,6 +26,7 @@ struct DownloadItem: Identifiable, Sendable, Equatable {
     var completedAt: Date?
     var filePath: String?
     var aria2Gid: String?
+    var torrentFiles: [TorrentFileItem]
 
     var eta: TimeInterval? {
         guard speed > 0, let fileSize, fileSize > downloadedSize else { return nil }
@@ -74,7 +86,8 @@ struct DownloadItem: Identifiable, Sendable, Equatable {
         createdAt: Date = Date(),
         completedAt: Date? = nil,
         filePath: String? = nil,
-        aria2Gid: String? = nil
+        aria2Gid: String? = nil,
+        torrentFiles: [TorrentFileItem] = []
     ) {
         self.id = id
         self.url = url
@@ -90,6 +103,7 @@ struct DownloadItem: Identifiable, Sendable, Equatable {
         self.completedAt = completedAt
         self.filePath = filePath
         self.aria2Gid = aria2Gid
+        self.torrentFiles = torrentFiles
     }
 
     init(record: DownloadRecord) {
@@ -110,6 +124,7 @@ struct DownloadItem: Identifiable, Sendable, Equatable {
         self.completedAt = record.completedAt
         self.filePath = record.filePath
         self.aria2Gid = record.aria2Gid
+        self.torrentFiles = []
     }
 }
 

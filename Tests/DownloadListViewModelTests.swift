@@ -94,6 +94,17 @@ actor MockAria2Controller: DownloadManagingAria2 {
     return stoppedStatuses
   }
 
+  private var addTorrentCalls: [(data: Data, dir: String)] = []
+
+  func addTorrent(data: Data, dir: String) async throws(Aria2Error) -> String {
+    addTorrentCalls.append((data: data, dir: dir))
+    return addResult
+  }
+
+  func recordedAddTorrentCalls() -> [(data: Data, dir: String)] {
+    addTorrentCalls
+  }
+
   func setStatuses(
     active: [Aria2Status] = [],
     waiting: [Aria2Status] = [],
@@ -128,7 +139,8 @@ private func makeStatus(
     downloadSpeed: downloadSpeed,
     files: nil,
     errorCode: nil,
-    errorMessage: nil
+    errorMessage: nil,
+    followedBy: nil
   )
 }
 

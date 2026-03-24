@@ -39,7 +39,9 @@ final class AddDownloadViewModel {
 
     var isOKEnabled: Bool {
         guard case .idle = state else { return false }
-        return isValidHTTPURL(urlText)
+        let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if localTorrentFileURL != nil { return true }
+        return isValidHTTPURL(trimmed) || isValidMagnetOrTorrentURL(trimmed)
     }
 
     var isDownloadEnabled: Bool {
@@ -61,6 +63,7 @@ final class AddDownloadViewModel {
     private var resolvedMetadata: URLMetadata?
     private var trimmedURLString: String = ""
     private var interceptedMessage: NativeMessage?
+    private(set) var localTorrentFileURL: URL?
 
     init(
         metadataService: any URLMetadataService,
@@ -83,8 +86,14 @@ final class AddDownloadViewModel {
     func submitURL() async {
         guard case .idle = state else { return }
 
+        if let torrentURL = localTorrentFileURL {
+            await submitTorrentFile(torrentURL)
+            return
+        }
+
         let trimmed = urlText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard isValidHTTPURL(trimmed), let url = URL(string: trimmed) else { return }
+        guard isValidHTTPURL(trimmed) || isValidMagnetOrTorrentURL(trimmed),
+              let url = URL(string: trimmed) else { return }
 
         trimmedURLString = trimmed
         queryGeneration += 1
@@ -201,13 +210,32 @@ final class AddDownloadViewModel {
         let headers = buildHeaders()
 
         do {
-            let gid = try await aria2.addDownload(
-                url: url,
-                headers: headers,
-                dir: selectedDirectory,
-                segments: segments,
-                outputFileName: sanitizedFilename
-            )
+            let gid: String
+            if let torrentData = localTorrentFileURL.flatMap({ try? Data(contentsOf: $0) }) {
+                gid = try await aria2.addTorrent(data: torrentData, dir: selectedDirectory)
+            } else if let url = URL(string: trimmedURLString), url.isMagnetURI || url.isTorrentURL {
+                // Magnet links and remote .torrent URLs: aria2 resolves the real filename
+                // from the torrent metadata, so don't force an output file name.
+                gid = try await aria2.addDownload(
+                    url: url,
+                    headers: headers,
+                    dir: selectedDirectory,
+                    segments: segments,
+                    outputFileName: nil
+                )
+            } else {
+                guard let url = URL(string: trimmedURLString) else {
+                    resetState()
+                    return
+                }
+                gid = try await aria2.addDownload(
+                    url: url,
+                    headers: headers,
+                    dir: selectedDirectory,
+                    segments: segments,
+                    outputFileName: sanitizedFilename
+                )
+            }
 
             var headersJSON: String?
             if !headers.isEmpty, let data = try? JSONEncoder().encode(headers) {
@@ -215,7 +243,7 @@ final class AddDownloadViewModel {
             }
 
             let record = DownloadRecord(
-                url: trimmedURLString,
+                url: localTorrentFileURL?.absoluteString ?? trimmedURLString,
                 filename: sanitizedFilename,
                 fileSize: metadata?.fileSize,
                 status: DownloadStatus.downloading.rawValue,
@@ -230,6 +258,12 @@ final class AddDownloadViewModel {
         } catch {}
 
         resetState()
+    }
+
+    func prefillTorrentFile(at url: URL) async {
+        localTorrentFileURL = url
+        urlText = url.lastPathComponent
+        await submitURL()
     }
 
     func prefill(url: String) {
@@ -259,6 +293,7 @@ final class AddDownloadViewModel {
         trimmedURLString = ""
         availableDiskSpace = nil
         interceptedMessage = nil
+        localTorrentFileURL = nil
     }
 
     private func buildHeaders() -> [String: String] {
@@ -331,6 +366,32 @@ final class AddDownloadViewModel {
         guard scheme == "http" || scheme == "https" else { return false }
         guard let host = url.host, !host.isEmpty else { return false }
         return true
+    }
+
+    private func isValidMagnetOrTorrentURL(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let url = URL(string: trimmed) else { return false }
+        return url.isMagnetURI || url.isTorrentURL
+    }
+
+    private func submitTorrentFile(_ fileURL: URL) async {
+        trimmedURLString = fileURL.absoluteString
+        queryGeneration += 1
+        let generation = queryGeneration
+
+        state = .querying
+
+        let filename = fileURL.deletingPathExtension().lastPathComponent
+        let metadata = URLMetadata(filename: filename, fileSize: nil)
+
+        guard generation == queryGeneration, case .querying = state else { return }
+
+        resolvedMetadata = metadata
+        let dir = resolveDefaultDirectory()
+        directoryOptions = await buildDirectoryOptions(defaultDir: dir)
+        selectedDirectory = dir
+        editableFilename = filename
+        state = .newDownload(metadata)
     }
 
     private func isValidFilename(_ name: String) -> Bool {

@@ -34,6 +34,7 @@ const CHROME_EXTENSION_ID = "iomcmbjooojnddcbbillnngpdmionlmo";
 
 const SOURCE_FILES = [
   "background.js",
+  "content.js",
   "popup.html",
   "popup.js",
   "popup.css",
@@ -70,6 +71,11 @@ function chromeManifest() {
   manifest.name = "Mac Download Manager";
   manifest.key = CHROME_EXTENSION_KEY;
   manifest.background = { service_worker: "background.js" };
+  manifest.content_scripts = [{
+    matches: ["<all_urls>"],
+    js: ["content.js"],
+    run_at: "document_idle"
+  }];
   return manifest;
 }
 
@@ -80,6 +86,11 @@ function edgeManifest() {
     "Intercept downloads and send them to Mac Download Manager for accelerated downloading (Edge)";
   manifest.key = CHROME_EXTENSION_KEY;
   manifest.background = { service_worker: "background.js" };
+  manifest.content_scripts = [{
+    matches: ["<all_urls>"],
+    js: ["content.js"],
+    run_at: "document_idle"
+  }];
   return manifest;
 }
 
@@ -93,6 +104,11 @@ function firefoxManifest() {
       strict_min_version: "109.0",
     },
   };
+  manifest.content_scripts = [{
+    matches: ["<all_urls>"],
+    js: ["content.js"],
+    run_at: "document_idle"
+  }];
   return manifest;
 }
 

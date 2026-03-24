@@ -66,6 +66,10 @@ struct DownloadListView: View {
             guard newValue != nil else { return }
             handlePendingExtensionDownload()
         }
+        .onChange(of: container.pendingTorrentFileURL) { _, newValue in
+            guard let url = newValue else { return }
+            handleTorrentFileURL(url)
+        }
         .alert(
             "Error",
             isPresented: Binding(
@@ -88,6 +92,14 @@ struct DownloadListView: View {
             }
         } message: { item in
             Text("Are you sure you want to delete \"\(item.filename)\"?")
+        }
+        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
+            guard let provider = providers.first else { return false }
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url, url.isTorrentURL else { return }
+                DispatchQueue.main.async { handleTorrentFileURL(url) }
+            }
+            return true
         }
     }
 
@@ -146,6 +158,9 @@ struct DownloadListView: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                             .help(item.filename)
+                        if item.torrentFiles.count > 1 {
+                            TorrentFilesButton(files: item.torrentFiles)
+                        }
                     }
                 }
                 .width(min: 200, ideal: 300)
@@ -255,6 +270,12 @@ struct DownloadListView: View {
             }
             .keyboardShortcut("n", modifiers: .command)
 
+            Button {
+                openTorrentFilePanel()
+            } label: {
+                Label("Open .torrent File…", systemImage: "doc.badge.arrow.down")
+            }
+
             if let selected = selectedItem(vm: vm) {
                 switch selected.status {
                 case .downloading, .waiting:
@@ -340,5 +361,118 @@ struct DownloadListView: View {
         viewModel?.isAddURLPresented = true
 
         Task { await addVM.submitURL() }
+    }
+
+    private func handleTorrentFileURL(_ url: URL) {
+        container.pendingTorrentFileURL = nil
+
+        if viewModel?.isAddURLPresented == true {
+            viewModel?.isAddURLPresented = false
+            addDownloadViewModel?.cancel()
+            addDownloadViewModel = nil
+        }
+
+        let addVM = AddDownloadViewModel(
+            metadataService: DefaultURLMetadataService(),
+            repository: container.repository,
+            aria2: container.aria2Client,
+            settings: container.settingsViewModel
+        )
+        addDownloadViewModel = addVM
+        viewModel?.isAddURLPresented = true
+
+        Task { await addVM.prefillTorrentFile(at: url) }
+    }
+
+    private func openTorrentFilePanel() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.torrent]
+        panel.allowsMultipleSelection = false
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.begin { response in
+            guard response == .OK, let url = panel.url, url.isTorrentURL else { return }
+            handleTorrentFileURL(url)
+        }
+    }
+}
+
+private struct TorrentFilesButton: View {
+    let files: [TorrentFileItem]
+    @State private var isShowingPopover = false
+    @State private var isHovered = false
+
+    var body: some View {
+        Button {
+            isShowingPopover = true
+        } label: {
+            Label("\(files.count) files", systemImage: "doc.on.doc")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(isHovered ? .primary : .secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(isHovered
+                              ? Color.accentColor.opacity(0.15)
+                              : Color.secondary.opacity(0.12))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 4)
+                        .strokeBorder(
+                            isHovered ? Color.accentColor.opacity(0.5) : Color.secondary.opacity(0.25),
+                            lineWidth: 0.5
+                        )
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .popover(isPresented: $isShowingPopover, arrowEdge: .trailing) {
+            TorrentFilesPopoverView(files: files)
+        }
+    }
+}
+
+private struct TorrentFilesPopoverView: View {
+    let files: [TorrentFileItem]
+
+    private static let byteFormatter: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.countStyle = .file
+        return f
+    }()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Files (\(files.count))")
+                .font(.headline)
+                .padding(.horizontal, 12)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+            Divider()
+            List(files) { file in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(file.filename)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    HStack(spacing: 8) {
+                        ProgressView(value: file.progress)
+                            .progressViewStyle(.linear)
+                            .frame(maxWidth: 120)
+                        Text("\(Int(file.progress * 100))%")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(Self.byteFormatter.string(fromByteCount: file.fileSize))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+            .listStyle(.plain)
+        }
+        .frame(width: 380, height: min(CGFloat(files.count) * 52 + 56, 420))
     }
 }
