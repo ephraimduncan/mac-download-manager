@@ -10,7 +10,14 @@ const FIREFOX_SRC_DIR = join(ROOT, "Extensions", "Shared", "firefox");
 const ICONS_DIR = join(ROOT, "Extensions", "Shared", "icons");
 const DIST_DIR = join(ROOT, "dist");
 
-const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
+const pkgPath = join(ROOT, "package.json");
+const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+
+if (process.env.RELEASE_VERSION) {
+  pkg.version = process.env.RELEASE_VERSION.replace(/^v/, "");
+  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+}
+
 const VERSION = pkg.version;
 
 const BROWSERS = ["chrome", "firefox", "edge"];
