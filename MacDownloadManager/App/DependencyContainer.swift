@@ -49,6 +49,7 @@ final class DependencyContainer {
     var menuBarDownloads: [MenuBarDownload] = []
     var globalDownloadSpeed: Int64 = 0
     var pendingExtensionDownload: PendingExtensionDownload?
+    var pendingMetalinkFileURL: URL?
     var openMainWindow: (() -> Void)?
 
     var menuBarIcon: String {

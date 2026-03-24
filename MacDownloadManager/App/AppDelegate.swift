@@ -47,6 +47,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         endDownloadActivity()
     }
 
+    func application(_ application: NSApplication, openFile filename: String) -> Bool {
+        let url = URL(fileURLWithPath: filename)
+        guard url.isMetalinkURL else { return false }
+        container.pendingMetalinkFileURL = url
+        return true
+    }
+
     private func startAria2() {
         let downloadDir = URL.downloadsDirectory.path(percentEncoded: false)
         do {

@@ -49,7 +49,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Mac Download Manager
         INFOPLIST_KEY_LSUIElement: false
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        GENERATE_INFOPLIST_FILE: true
+        GENERATE_INFOPLIST_FILE: false
+        INFOPLIST_FILE: MacDownloadManager/Info.plist
         CODE_SIGN_IDENTITY: "-"
     postCompileScripts:
       - script: |

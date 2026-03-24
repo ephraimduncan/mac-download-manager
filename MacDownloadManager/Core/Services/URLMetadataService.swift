@@ -41,6 +41,9 @@ final class DefaultURLMetadataService: URLMetadataService {
     }
 
     func fetchMetadata(for url: URL) async -> URLMetadata {
+        guard !url.isMetalinkURL else {
+            return fallbackMetadata(for: url)
+        }
         do {
             let (httpResponse, _) = try await client.head(
                 url: url,
@@ -60,7 +63,14 @@ final class DefaultURLMetadataService: URLMetadataService {
     }
 
     private func fallbackMetadata(for url: URL) -> URLMetadata {
-        URLMetadata(filename: sanitizeFilename(url.suggestedFilename), fileSize: nil)
+        var name = url.suggestedFilename
+        // Strip the container extension so the user sees the real filename
+        // e.g. "ubuntu.iso.meta4" → "ubuntu.iso"
+        let ext = (name as NSString).pathExtension.lowercased()
+        if ext == "meta4" || ext == "metalink" {
+            name = (name as NSString).deletingPathExtension
+        }
+        return URLMetadata(filename: sanitizeFilename(name), fileSize: nil)
     }
 
     private func resolveFilename(from response: HTTPURLResponse, url: URL) -> String {

@@ -66,6 +66,11 @@ struct DownloadListView: View {
             guard newValue != nil else { return }
             handlePendingExtensionDownload()
         }
+        .task(id: container.pendingMetalinkFileURL) {
+            guard let url = container.pendingMetalinkFileURL else { return }
+            container.pendingMetalinkFileURL = nil
+            handleMetalinkFileURL(url)
+        }
         .alert(
             "Error",
             isPresented: Binding(
@@ -112,6 +117,15 @@ struct DownloadListView: View {
                     get: { vm.searchText },
                     set: { vm.searchText = $0 }
                 ), prompt: "Search downloads")
+                .onDrop(of: [UTType.fileURL], isTargeted: nil) { providers in
+                    for provider in providers {
+                        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                            guard let url = item as? URL, url.isMetalinkURL else { return }
+                            Task { @MainActor in handleMetalinkFileURL(url) }
+                        }
+                    }
+                    return true
+                }
         }
     }
 
@@ -255,6 +269,18 @@ struct DownloadListView: View {
             }
             .keyboardShortcut("n", modifiers: .command)
 
+            Button {
+                let panel = NSOpenPanel()
+                panel.allowedContentTypes = [.meta4, .metalink]
+                panel.allowsMultipleSelection = false
+                panel.canChooseDirectories = false
+                panel.title = "Open Metalink File"
+                guard panel.runModal() == .OK, let url = panel.url else { return }
+                handleMetalinkFileURL(url)
+            } label: {
+                Label("Open Metalink File\u{2026}", systemImage: "doc.badge.plus")
+            }
+
             if let selected = selectedItem(vm: vm) {
                 switch selected.status {
                 case .downloading, .waiting:
@@ -340,5 +366,24 @@ struct DownloadListView: View {
         viewModel?.isAddURLPresented = true
 
         Task { await addVM.submitURL() }
+    }
+
+    private func handleMetalinkFileURL(_ url: URL) {
+        if viewModel?.isAddURLPresented == true {
+            viewModel?.isAddURLPresented = false
+            addDownloadViewModel?.cancel()
+            addDownloadViewModel = nil
+        }
+
+        let addVM = AddDownloadViewModel(
+            metadataService: DefaultURLMetadataService(),
+            repository: container.repository,
+            aria2: container.aria2Client,
+            settings: container.settingsViewModel
+        )
+        addDownloadViewModel = addVM
+        viewModel?.isAddURLPresented = true
+
+        Task { await addVM.prefillMetalinkFile(at: url) }
     }
 }

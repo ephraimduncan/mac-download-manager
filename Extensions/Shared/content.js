@@ -49,7 +49,7 @@ document.addEventListener("click", (event) => {
   const filename = getFilename(href);
   const referrer = document.location.href;
 
-  browser.runtime.sendMessage({
+  chrome.runtime.sendMessage({
     type: "interceptedDownload",
     url: href,
     filename: filename,

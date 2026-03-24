@@ -3,7 +3,8 @@ const NATIVE_HOST = "com.macdownloadmanager.helper";
 const DEFAULT_FILE_TYPES = [
   "zip", "dmg", "iso", "pkg", "tar.gz", "7z", "rar",
   "mp4", "mkv", "avi", "mov", "mp3", "flac",
-  "exe", "msi", "deb", "AppImage"
+  "exe", "msi", "deb", "AppImage",
+  "meta4", "metalink"
 ];
 
 const DEFAULT_SETTINGS = {

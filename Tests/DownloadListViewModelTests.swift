@@ -59,6 +59,10 @@ actor MockAria2Controller: DownloadManagingAria2 {
     return addResult
   }
 
+  func addMetalink(data: Data, dir: String) async throws(Aria2Error) -> [String] {
+    return [addResult]
+  }
+
   func pause(gid: String) async throws(Aria2Error) {
     if let pauseError {
       throw pauseError

@@ -26,6 +26,7 @@ final class AddDownloadViewModel {
 
     private(set) var state: State = .idle
     var urlText: String = ""
+    private(set) var localMetalinkFileURL: URL?
     var editableFilename: String = ""
 
     var selectedDirectory: String = "" {
@@ -191,7 +192,61 @@ final class AddDownloadViewModel {
         let sanitizedFilename = sanitizeFilename(editableFilename)
         guard !sanitizedFilename.isEmpty, !selectedDirectory.isEmpty else { return }
         guard fileManager.isWritableFile(atPath: selectedDirectory) else { return }
+
+        if let metalinkURL = localMetalinkFileURL {
+            let data: Data
+            do {
+                data = try Data(contentsOf: metalinkURL)
+            } catch {
+                resetState()
+                return
+            }
+            do {
+                let gids = try await aria2.addMetalink(data: data, dir: selectedDirectory)
+                for gid in gids {
+                    let record = DownloadRecord(
+                        url: metalinkURL.absoluteString,
+                        filename: sanitizedFilename,
+                        fileSize: nil,
+                        status: DownloadStatus.downloading.rawValue,
+                        segments: settings.defaultSegments,
+                        headersJSON: nil,
+                        filePath: selectedDirectory,
+                        aria2Gid: gid
+                    )
+                    try await repository.save(record)
+                }
+                notificationService.postDownloadStarted(filename: sanitizedFilename)
+            } catch {}
+            resetState()
+            return
+        }
+
         guard let url = URL(string: trimmedURLString) else {
+            resetState()
+            return
+        }
+
+        // Remote .meta4 / .metalink: fetch the XML ourselves then hand it to aria2
+        if url.isMetalinkURL {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let gids = try await aria2.addMetalink(data: data, dir: selectedDirectory)
+                for gid in gids {
+                    let record = DownloadRecord(
+                        url: trimmedURLString,
+                        filename: sanitizedFilename,
+                        fileSize: nil,
+                        status: DownloadStatus.downloading.rawValue,
+                        segments: settings.defaultSegments,
+                        headersJSON: nil,
+                        filePath: selectedDirectory,
+                        aria2Gid: gid
+                    )
+                    try await repository.save(record)
+                }
+                notificationService.postDownloadStarted(filename: sanitizedFilename)
+            } catch {}
             resetState()
             return
         }
@@ -236,6 +291,18 @@ final class AddDownloadViewModel {
         urlText = url
     }
 
+    func prefillMetalinkFile(at url: URL) async {
+        localMetalinkFileURL = url
+        let displayName = url.deletingPathExtension().lastPathComponent
+        let name = sanitizeFilename(displayName.isEmpty ? "download" : displayName)
+        let dir = resolveDefaultDirectory()
+        directoryOptions = await buildDirectoryOptions(defaultDir: dir)
+        selectedDirectory = dir
+        refreshDiskSpace()
+        editableFilename = name
+        state = .newDownload(URLMetadata(filename: name, fileSize: nil))
+    }
+
     func prefill(message: NativeMessage) {
         urlText = message.url
         interceptedMessage = message
@@ -252,6 +319,7 @@ final class AddDownloadViewModel {
     private func resetState() {
         state = .idle
         urlText = ""
+        localMetalinkFileURL = nil
         editableFilename = ""
         selectedDirectory = ""
         directoryOptions = []
