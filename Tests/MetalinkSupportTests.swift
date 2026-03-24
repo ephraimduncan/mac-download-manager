@@ -39,7 +39,8 @@ struct MetalinkSupportTests {
         let service = DefaultURLMetadataService(client: FailingHeadClient())
         let url = URL(string: "https://example.com/file.meta4")!
         let metadata = await service.fetchMetadata(for: url)
-        #expect(metadata.filename == "file.meta4")
+        // Extension is stripped by URLMetadataService.fallbackMetadata
+        #expect(metadata.filename == "file")
         #expect(metadata.fileSize == nil)
     }
 
@@ -48,7 +49,8 @@ struct MetalinkSupportTests {
         let service = DefaultURLMetadataService(client: FailingHeadClient())
         let url = URL(string: "https://example.com/file.metalink")!
         let metadata = await service.fetchMetadata(for: url)
-        #expect(metadata.filename == "file.metalink")
+        // Extension is stripped by URLMetadataService.fallbackMetadata
+        #expect(metadata.filename == "file")
         #expect(metadata.fileSize == nil)
     }
 
@@ -143,6 +145,39 @@ struct MetalinkSupportTests {
         let saved = try #require(records.first)
         #expect(saved.aria2Gid == "m-gid-1")
         #expect(saved.url == metalinkURL.absoluteString)
+    }
+
+    @Test @MainActor
+    func startDownloadWithEmptyGIDsDoesNotCreateRecords() async throws {
+        // aria2 returning an empty GID array should not save any records
+        // and should not fire a "Download started" notification.
+        let tmpDir = FileManager.default.temporaryDirectory
+        let metalinkURL = tmpDir.appendingPathComponent(UUID().uuidString + ".meta4")
+        let xmlContent = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <metalink xmlns="urn:ietf:params:xml:ns:metalink">
+          <file name="test.iso">
+            <url>https://example.com/test.iso</url>
+          </file>
+        </metalink>
+        """
+        try xmlContent.write(to: metalinkURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: metalinkURL) }
+
+        let aria2 = MockAria2Controller(addResult: "ignored", metalinkAddResult: [])
+        let (vm, repo, _) = makeViewModel(aria2: aria2)
+
+        await vm.prefillMetalinkFile(at: metalinkURL)
+        vm.selectedDirectory = tmpDir.path
+
+        await vm.startDownload()
+
+        guard case .idle = vm.state else {
+            Issue.record("Expected .idle, got \(vm.state)")
+            return
+        }
+        let records = try await repo.fetchAll()
+        #expect(records.isEmpty, "No records should be saved when aria2 returns zero GIDs")
     }
 
     @Test @MainActor

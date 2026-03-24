@@ -26,7 +26,7 @@
 			<key>CFBundleTypeName</key>
 			<string>Metalink 4 File</string>
 			<key>CFBundleTypeRole</key>
-			<string>None</string>
+			<string>Viewer</string>
 			<key>LSHandlerRank</key>
 			<string>Owner</string>
 			<key>CFBundleTypeExtensions</key>
@@ -42,7 +42,7 @@
 			<key>CFBundleTypeName</key>
 			<string>Metalink File</string>
 			<key>CFBundleTypeRole</key>
-			<string>None</string>
+			<string>Viewer</string>
 			<key>LSHandlerRank</key>
 			<string>Owner</string>
 			<key>CFBundleTypeExtensions</key>

@@ -196,7 +196,10 @@ final class AddDownloadViewModel {
         if let metalinkURL = localMetalinkFileURL {
             let data: Data
             do {
-                data = try Data(contentsOf: metalinkURL)
+                // Read off the main actor to avoid blocking the UI thread
+                data = try await Task.detached(priority: .userInitiated) {
+                    try Data(contentsOf: metalinkURL)
+                }.value
             } catch {
                 resetState()
                 return
@@ -216,7 +219,9 @@ final class AddDownloadViewModel {
                     )
                     try await repository.save(record)
                 }
-                notificationService.postDownloadStarted(filename: sanitizedFilename)
+                if !gids.isEmpty {
+                    notificationService.postDownloadStarted(filename: sanitizedFilename)
+                }
             } catch {}
             resetState()
             return
@@ -245,7 +250,9 @@ final class AddDownloadViewModel {
                     )
                     try await repository.save(record)
                 }
-                notificationService.postDownloadStarted(filename: sanitizedFilename)
+                if !gids.isEmpty {
+                    notificationService.postDownloadStarted(filename: sanitizedFilename)
+                }
             } catch {}
             resetState()
             return
