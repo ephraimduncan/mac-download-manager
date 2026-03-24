@@ -66,8 +66,8 @@ struct DownloadListView: View {
             guard newValue != nil else { return }
             handlePendingExtensionDownload()
         }
-        .onChange(of: container.pendingTorrentFileURL) { _, newValue in
-            guard let url = newValue else { return }
+        .task(id: container.pendingTorrentFileURL) {
+            guard let url = container.pendingTorrentFileURL else { return }
             handleTorrentFileURL(url)
         }
         .alert(

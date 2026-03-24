@@ -211,8 +211,14 @@ final class AddDownloadViewModel {
 
         do {
             let gid: String
-            if let torrentData = localTorrentFileURL.flatMap({ try? Data(contentsOf: $0) }) {
-                gid = try await aria2.addTorrent(data: torrentData, dir: selectedDirectory)
+            if let localURL = localTorrentFileURL {
+                do {
+                    let torrentData = try Data(contentsOf: localURL)
+                    gid = try await aria2.addTorrent(data: torrentData, dir: selectedDirectory)
+                } catch {
+                    resetState()
+                    return
+                }
             } else if let url = URL(string: trimmedURLString), url.isMagnetURI || url.isTorrentURL {
                 // Magnet links and remote .torrent URLs: aria2 resolves the real filename
                 // from the torrent metadata, so don't force an output file name.
@@ -371,7 +377,10 @@ final class AddDownloadViewModel {
     private func isValidMagnetOrTorrentURL(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let url = URL(string: trimmed) else { return false }
-        return url.isMagnetURI || url.isTorrentURL
+        if url.isMagnetURI { return true }
+        guard let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else { return false }
+        return url.isTorrentURL
     }
 
     private func submitTorrentFile(_ fileURL: URL) async {

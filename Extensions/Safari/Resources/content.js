@@ -30,6 +30,8 @@ function getFilename(url) {
 }
 
 document.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) return;
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   const link = event.target.closest("a[href]");
   if (!link) return;
 
