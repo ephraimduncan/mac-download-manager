@@ -235,7 +235,11 @@ final class AddDownloadViewModel {
         // Remote .meta4 / .metalink: fetch the XML ourselves then hand it to aria2
         if url.isMetalinkURL {
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                var metalinkRequest = URLRequest(url: url)
+                for (key, value) in buildHeaders() {
+                    metalinkRequest.setValue(value, forHTTPHeaderField: key)
+                }
+                let (data, _) = try await URLSession.shared.data(for: metalinkRequest)
                 let gids = try await aria2.addMetalink(data: data, dir: selectedDirectory)
                 for gid in gids {
                     let record = DownloadRecord(
