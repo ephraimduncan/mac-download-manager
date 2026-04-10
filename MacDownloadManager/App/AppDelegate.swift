@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pollingTask: Task<Void, Never>?
+    private var aria2LaunchTask: Task<Void, Never>?
     private var activityToken: NSObjectProtocol?
     private var safariDownloadMonitor: SafariDownloadMonitor?
 
@@ -47,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        aria2LaunchTask?.cancel()
         pollingTask?.cancel()
         safariDownloadMonitor?.stop()
         container.socketServer.stop()
@@ -54,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startAria2() {
-        Task {
+        aria2LaunchTask = Task {
             let downloadDir = URL.downloadsDirectory.path(percentEncoded: false)
             do {
                 try await container.processManager.launch(
