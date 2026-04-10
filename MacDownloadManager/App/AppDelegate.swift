@@ -47,6 +47,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         endDownloadActivity()
     }
 
+    func application(_: NSApplication, openFile fileName: String) -> Bool {
+        guard fileName.lowercased().hasSuffix(".torrent") else { return false }
+        let fileURL = URL(fileURLWithPath: fileName)
+        container.pendingTorrentFileURL = fileURL
+        NSApp.activate(ignoringOtherApps: true)
+        if let window = NSApp.windows.first(where: { $0.title == "Mac Download Manager" })
+            ?? NSApp.windows.first(where: { !$0.isMiniaturized }) {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            container.openMainWindow?()
+        }
+        return true
+    }
+
     private func startAria2() {
         let downloadDir = URL.downloadsDirectory.path(percentEncoded: false)
         do {

@@ -1,6 +1,27 @@
 import Foundation
+import UniformTypeIdentifiers
+
+extension UTType {
+    static let torrent = UTType(importedAs: "org.bittorrent.torrent")
+}
 
 extension URL {
+    var isMagnetURI: Bool {
+        scheme?.lowercased() == "magnet"
+    }
+
+    var isTorrentURL: Bool {
+        pathExtension.lowercased() == "torrent"
+    }
+
+    var magnetDisplayName: String? {
+        guard isMagnetURI,
+              let components = URLComponents(url: self, resolvingAgainstBaseURL: false),
+              let dn = components.queryItems?.first(where: { $0.name == "dn" })?.value,
+              !dn.isEmpty else { return nil }
+        return dn.removingPercentEncoding ?? dn
+    }
+
     var fileExtension: String {
         pathExtension.lowercased()
     }

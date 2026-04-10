@@ -27,6 +27,9 @@ struct Aria2Status: Decodable, Sendable {
     let files: [Aria2File]?
     let errorCode: String?
     let errorMessage: String?
+    /// When aria2 finishes fetching torrent metadata it creates the real torrent
+    /// download and adds its GID here on the metadata-fetch entry.
+    let followedBy: [String]?
 
     var totalBytes: Int64 { Int64(totalLength) ?? 0 }
     var completedBytes: Int64 { Int64(completedLength) ?? 0 }

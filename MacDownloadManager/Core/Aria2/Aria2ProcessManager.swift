@@ -31,7 +31,15 @@ final class Aria2ProcessManager {
             "--max-concurrent-downloads=\(maxConcurrent)",
             "--dir=\(downloadDir)",
             "--file-allocation=none",
-            "--auto-file-renaming=true"
+            "--auto-file-renaming=true",
+            // BitTorrent / magnet link support
+            "--enable-dht=true",
+            "--enable-dht6=false",
+            "--dht-listen-port=6881-6999",
+            "--enable-peer-exchange=true",
+            "--bt-enable-lpd=true",
+            "--bt-save-metadata=true",
+            "--bt-detach-seed-only=true"
         ]
         process.standardOutput = nil
         process.standardError = nil

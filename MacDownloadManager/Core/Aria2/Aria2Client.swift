@@ -16,6 +16,7 @@ protocol DownloadManagingAria2: Actor {
     func tellActive() async throws(Aria2Error) -> [Aria2Status]
     func tellWaiting(offset: Int, count: Int) async throws(Aria2Error) -> [Aria2Status]
     func tellStopped(offset: Int, count: Int) async throws(Aria2Error) -> [Aria2Status]
+    func addTorrent(data: Data, dir: String) async throws(Aria2Error) -> String
 }
 
 actor Aria2Client: DownloadManagingAria2 {
@@ -118,6 +119,18 @@ actor Aria2Client: DownloadManagingAria2 {
     func tellStopped(offset: Int, count: Int) async throws(Aria2Error) -> [Aria2Status] {
         let params: [AnyCodable] = [.string(tokenParam), .int(offset), .int(count)]
         return try await call(method: "aria2.tellStopped", params: params)
+    }
+
+    func addTorrent(data: Data, dir: String) async throws(Aria2Error) -> String {
+        let base64 = data.base64EncodedString()
+        let options: [String: AnyCodable] = ["dir": .string(dir)]
+        let params: [AnyCodable] = [
+            .string(tokenParam),
+            .string(base64),
+            .array([]),
+            .mixedDict(options)
+        ]
+        return try await call(method: "aria2.addTorrent", params: params)
     }
 
     func getGlobalStat() async throws(Aria2Error) -> Aria2GlobalStat {

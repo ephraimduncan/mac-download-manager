@@ -41,6 +41,12 @@ final class DefaultURLMetadataService: URLMetadataService {
     }
 
     func fetchMetadata(for url: URL) async -> URLMetadata {
+        if url.isMagnetURI {
+            return URLMetadata(filename: url.magnetDisplayName ?? "torrent-download", fileSize: nil)
+        }
+        if url.isTorrentURL {
+            return URLMetadata(filename: url.suggestedFilename, fileSize: nil)
+        }
         do {
             let (httpResponse, _) = try await client.head(
                 url: url,

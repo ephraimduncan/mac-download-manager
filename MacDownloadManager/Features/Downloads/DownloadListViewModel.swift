@@ -261,6 +261,17 @@ final class DownloadListViewModel {
         continue
       }
 
+      // Magnet/torrent: when aria2 finishes the metadata-fetch phase it creates a
+      // new download and lists its GID in followedBy. Switch our tracked GID to the
+      // real torrent download so subsequent polls show correct progress.
+      if let realGid = status.followedBy?.first {
+        await updateItem(id: downloads[index].id) {
+          $0.aria2Gid = realGid
+          $0.status = .downloading
+        }
+        continue
+      }
+
       let existing = downloads[index]
       let resolvedFilename = resolveFilename(from: status, fallback: existing.filename)
       let mappedStatus = mapAria2Status(status.status)
@@ -275,6 +286,23 @@ final class DownloadListViewModel {
       )
       let resolvedDownloadedSize = preservedProgress?.downloadedSize ?? status.completedBytes
       let resolvedProgress = preservedProgress?.progress ?? status.progress
+
+      // Build per-file progress list for multi-file torrents.
+      let resolvedTorrentFiles: [TorrentFileItem]
+      if let files = status.files, files.count > 1 {
+        resolvedTorrentFiles = files.compactMap { file in
+          let name = URL(fileURLWithPath: file.path).lastPathComponent
+          guard !name.isEmpty else { return nil }
+          return TorrentFileItem(
+            id: file.index,
+            filename: name,
+            fileSize: Int64(file.length) ?? 0,
+            downloadedSize: Int64(file.completedLength) ?? 0
+          )
+        }
+      } else {
+        resolvedTorrentFiles = existing.torrentFiles
+      }
 
       downloads[index] = DownloadItem(
         id: existing.id,
@@ -291,7 +319,8 @@ final class DownloadListViewModel {
         completedAt: mappedStatus == .completed
           ? (existing.completedAt ?? Date()) : existing.completedAt,
         filePath: existing.filePath,
-        aria2Gid: existing.aria2Gid
+        aria2Gid: existing.aria2Gid,
+        torrentFiles: resolvedTorrentFiles
       )
 
       do {
@@ -390,7 +419,7 @@ final class DownloadListViewModel {
     case "active": .downloading
     case "waiting": .waiting
     case "paused": .paused
-    case "complete": .completed
+    case "complete", "seeding": .completed
     case "error": .error
     case "removed": .removed
     default: .waiting

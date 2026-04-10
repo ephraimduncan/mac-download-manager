@@ -562,4 +562,101 @@ struct AddDownloadViewModelTests {
         let call = try #require(addCalls.first)
         #expect(call.headers.isEmpty)
     }
+
+    @Test @MainActor
+    func magnetURLEnablesOK() {
+        let (vm, _, _) = makeViewModel()
+        vm.urlText = "magnet:?xt=urn:btih:abc123&dn=SomeFile"
+        #expect(vm.isOKEnabled == true)
+    }
+
+    @Test @MainActor
+    func torrentHTTPSURLEnablesOK() {
+        let (vm, _, _) = makeViewModel()
+        vm.urlText = "https://example.com/file.torrent"
+        #expect(vm.isOKEnabled == true)
+    }
+
+    @Test @MainActor
+    func magnetURLTransitionsToNewDownload() async {
+        let metaService = MockURLMetadataService(filename: "SomeFile", fileSize: nil)
+        let (vm, _, _) = makeViewModel(metadataService: metaService)
+        vm.urlText = "magnet:?xt=urn:btih:abc123&dn=SomeFile"
+        await vm.submitURL()
+        guard case .newDownload = vm.state else {
+            Issue.record("Expected .newDownload, got \(vm.state)")
+            return
+        }
+        #expect(vm.editableFilename == "SomeFile")
+    }
+
+    @Test @MainActor
+    func magnetStartDownloadPassesNilOutputFilename() async throws {
+        let metaService = MockURLMetadataService(filename: "SomeFile", fileSize: nil)
+        let aria2 = MockAria2Controller(addResult: "magnet-gid")
+        let (vm, _, _) = makeViewModel(metadataService: metaService, aria2: aria2)
+        vm.urlText = "magnet:?xt=urn:btih:abc123&dn=SomeFile"
+
+        await vm.submitURL()
+        await vm.startDownload()
+
+        let addCalls = await aria2.recordedAddCalls()
+        let call = try #require(addCalls.first)
+        #expect(call.url.isMagnetURI)
+        #expect(call.outputFileName == nil)
+
+        let torrentCalls = await aria2.recordedAddTorrentCalls()
+        #expect(torrentCalls.isEmpty)
+    }
+
+    @Test @MainActor
+    func torrentFilePrefillTransitionsToNewDownload() async throws {
+        let torrentFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test_prefill.torrent")
+        try Data("fake torrent data".utf8).write(to: torrentFile)
+        defer { try? FileManager.default.removeItem(at: torrentFile) }
+
+        let aria2 = MockAria2Controller(addResult: "torrent-gid")
+        let (vm, _, _) = makeViewModel(aria2: aria2)
+
+        await vm.prefillTorrentFile(at: torrentFile)
+
+        guard case .newDownload(let metadata) = vm.state else {
+            Issue.record("Expected .newDownload, got \(vm.state)")
+            return
+        }
+        #expect(metadata.filename == "test_prefill")
+        #expect(vm.editableFilename == "test_prefill")
+    }
+
+    @Test @MainActor
+    func torrentFileStartDownloadCallsAddTorrentRPC() async throws {
+        let torrentFile = FileManager.default.temporaryDirectory
+            .appendingPathComponent("movie_test.torrent")
+        let fakeData = Data("fake torrent bytes".utf8)
+        try fakeData.write(to: torrentFile)
+        defer { try? FileManager.default.removeItem(at: torrentFile) }
+
+        let aria2 = MockAria2Controller(addResult: "addtorrent-gid")
+        let (vm, repo, _) = makeViewModel(aria2: aria2)
+
+        await vm.prefillTorrentFile(at: torrentFile)
+        guard case .newDownload = vm.state else {
+            Issue.record("Expected .newDownload, got \(vm.state)")
+            return
+        }
+
+        await vm.startDownload()
+
+        let torrentCalls = await aria2.recordedAddTorrentCalls()
+        #expect(torrentCalls.count == 1)
+        #expect(torrentCalls.first?.data == fakeData)
+
+        let addCalls = await aria2.recordedAddCalls()
+        #expect(addCalls.isEmpty)
+
+        let all = try await repo.fetchAll()
+        #expect(all.count == 1)
+        #expect(all.first?.aria2Gid == "addtorrent-gid")
+    }
 }

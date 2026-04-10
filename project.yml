@@ -49,8 +49,28 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Mac Download Manager
         INFOPLIST_KEY_LSUIElement: false
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        GENERATE_INFOPLIST_FILE: true
+        GENERATE_INFOPLIST_FILE: false
         CODE_SIGN_IDENTITY: "-"
+    info:
+      path: MacDownloadManager/Info.plist
+      properties:
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: BitTorrent File
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Alternate
+            LSItemContentTypes:
+              - org.bittorrent.torrent
+            CFBundleTypeExtensions:
+              - torrent
+        UTImportedTypeDeclarations:
+          - UTTypeIdentifier: org.bittorrent.torrent
+            UTTypeDescription: BitTorrent File
+            UTTypeConformsTo:
+              - public.data
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - torrent
+              public.mime-type: application/x-bittorrent
     postCompileScripts:
       - script: |
           cp "${BUILT_PRODUCTS_DIR}/NativeMessagingHelper" "${BUILT_PRODUCTS_DIR}/Mac Download Manager.app/Contents/MacOS/"
