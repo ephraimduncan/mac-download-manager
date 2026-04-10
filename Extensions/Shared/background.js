@@ -3,7 +3,8 @@ const NATIVE_HOST = "com.macdownloadmanager.helper";
 const DEFAULT_FILE_TYPES = [
   "zip", "dmg", "iso", "pkg", "tar.gz", "7z", "rar",
   "mp4", "mkv", "avi", "mov", "mp3", "flac",
-  "exe", "msi", "deb", "AppImage"
+  "exe", "msi", "deb", "AppImage",
+  "meta4", "metalink"
 ];
 
 const DEFAULT_SETTINGS = {
@@ -182,6 +183,16 @@ function updateBadge() {
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.type === "getStatus") {
     sendResponse({ connected: nativeConnected });
+  } else if (request.type === "interceptedDownload") {
+    const cached = headerCache.get(request.url);
+    const message = {
+      url: request.url,
+      headers: cached?.headers || null,
+      filename: request.filename || null,
+      fileSize: null,
+      referrer: request.referrer || cached?.headers?.referer || null
+    };
+    sendNativeMessage(message);
   }
   return false;
 });

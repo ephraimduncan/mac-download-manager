@@ -1,8 +1,18 @@
 import Foundation
+import UniformTypeIdentifiers
+
+extension UTType {
+    static var meta4: UTType { UTType(importedAs: "org.metalink.meta4") }
+    static var metalink: UTType { UTType(importedAs: "org.metalink") }
+}
 
 extension URL {
     var fileExtension: String {
         pathExtension.lowercased()
+    }
+
+    var isMetalinkURL: Bool {
+        fileExtension == "meta4" || fileExtension == "metalink"
     }
 
     var suggestedFilename: String {

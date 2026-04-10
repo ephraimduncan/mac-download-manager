@@ -16,6 +16,7 @@ actor MockAria2Controller: DownloadManagingAria2 {
   private var waitingStatuses: [Aria2Status]
   private var stoppedStatuses: [Aria2Status]
   private let addResult: String
+  private let metalinkAddResult: [String]
   private let pauseError: Aria2Error?
   private let resumeError: Aria2Error?
 
@@ -28,6 +29,7 @@ actor MockAria2Controller: DownloadManagingAria2 {
     waitingStatuses: [Aria2Status] = [],
     stoppedStatuses: [Aria2Status] = [],
     addResult: String = "new-gid",
+    metalinkAddResult: [String]? = nil,
     pauseError: Aria2Error? = nil,
     statusFailuresBeforeSuccess: Int = 0,
     resumeError: Aria2Error? = nil
@@ -36,6 +38,7 @@ actor MockAria2Controller: DownloadManagingAria2 {
     self.waitingStatuses = waitingStatuses
     self.stoppedStatuses = stoppedStatuses
     self.addResult = addResult
+    self.metalinkAddResult = metalinkAddResult ?? [addResult]
     self.pauseError = pauseError
     self.statusFailuresBeforeSuccess = statusFailuresBeforeSuccess
     self.resumeError = resumeError
@@ -57,6 +60,10 @@ actor MockAria2Controller: DownloadManagingAria2 {
         outputFileName: outputFileName
       ))
     return addResult
+  }
+
+  func addMetalink(data: Data, dir: String) async throws(Aria2Error) -> [String] {
+    return metalinkAddResult
   }
 
   func pause(gid: String) async throws(Aria2Error) {

@@ -35,9 +35,11 @@ echo "Configuring (Apple TLS, no external deps)..."
     --without-libgcrypt \
     --without-libnettle \
     --with-appletls \
+    --with-libxml2 \
     --disable-nls \
     --prefix=/dev/null \
-    CXXFLAGS="-O2" \
+    CXXFLAGS="-O2 -I$(xcrun --show-sdk-path)/usr/include/libxml2" \
+    LDFLAGS="-lxml2" \
     > /dev/null
 
 echo "Building ($(sysctl -n hw.ncpu) threads)..."
