@@ -47,6 +47,9 @@ describe("manifest validity and version", () => {
       assert.equal(manifest.manifest_version, 3);
       assert.equal(manifest.version, pkg.version);
       assert.ok(manifest.permissions.includes("nativeMessaging"));
+      assert.ok(manifest.permissions.includes("contextMenus"));
+      assert.ok(!manifest.permissions.includes("cookies"), "cookies must not be in base permissions");
+      assert.ok(manifest.optional_permissions?.includes("cookies"), "cookies must be in optional_permissions");
     });
   }
 });
